@@ -1,0 +1,11 @@
+# Format: <NetName>,<ServiceName>,<MTU>
+
+# First ATCA seperated network
+atca01,S3562-1-IP56,1500
+
+# DAQ3VAL FED Builder data network
+d3vfbs1v0,S3562-1X-IP30,9000
+# DAQ3VAL RU Builder data network
+d3vrbs1v0,S3562-1X-IP31,9000
+
+

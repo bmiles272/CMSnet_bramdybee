@@ -1,0 +1,9 @@
+# Format: <SourceNetName>,<DestNetName>,<GatewayIP>
+
+# We want a route from the first to the second and we use the default gateway
+d3vfbs1v0,d3vrbs1v0,
+
+# We want a route back and we need to define a specific gateway
+d3vrbs1v0,d3vfbs1v0,10.177.129.2
+
+

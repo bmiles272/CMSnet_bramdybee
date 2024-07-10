@@ -1,0 +1,5 @@
+# Format: <Switch>,<Port>,<Speed>,<PortType>
+
+# Switch with port 0/0/0 at 40Gb/s broken out to 4 ports
+D3VSW-ETH-C2E33-28-01--CMS,0/0/0,40,BROKEN_OUT_4
+

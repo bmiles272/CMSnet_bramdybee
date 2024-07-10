@@ -1,0 +1,19 @@
+# Format: <Device>,<Serial>,<Zone>,<Manufacturer>,<model>,<Description>,<Tag>,<OS>,<OSversion>,<building>,<floor>,<room>,<Responsible>,<MainUser>
+
+spare-c2d11-35-01,GJSFZG2,C2D11,Dell,"PowerEdge R330","My Desciption 1","test1",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+spare-c2d11-36-01,GJTBZG2,C2D11,Dell,"PowerEdge R330","My Desciption 2","test1",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+spare-c2d11-37-01,GJTFZG2,C2D11,Dell,"PowerEdge R330","My Desciption 3","test2",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+spare-c2d11-38-01,GJVBZG2,C2D11,Dell,"PowerEdge R330","My Desciption 4","test2",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+spare-c2d11-39-01,GJVGZG2,C2D11,Dell,"PowerEdge R330","My Desciption 5","test2",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+spare-c2d11-40-01,GJVKZG2,C2D11,Dell,"PowerEdge R330","My Desciption 6","test3",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+spare-c2d11-41-01,GJWDZG2,C2D11,Dell,"PowerEdge R330","My Desciption 7","test3",Linux,ALMA9,3562,1,0001,"Responsible","Main user"
+
+mch-c2d12-13-01,MCH6601,C2D12,NAT-Europe,"MCH","Description MCH","MCH",NONE,UNKNOWN,3562,1,0001,"Responsible","Main user"
+
+
