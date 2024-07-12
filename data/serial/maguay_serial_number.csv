@@ -1,3 +1,6 @@
+# Format: <Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
+
+
 #### Rack C2A01 ####
 MC17120214-1,a4:bf:01:2d:20:8d,,a4:bf:01:2d:20:8f
 MC17120214-2,a4:bf:01:28:c1:a1,,a4:bf:01:28:c1:a3

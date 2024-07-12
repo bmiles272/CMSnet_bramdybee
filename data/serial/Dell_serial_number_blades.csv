@@ -1,3 +1,6 @@
+# Format: <Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
+
+
 # Blade Chassis in C2E41-30 with the MACs
 FVZZW4J,84:2B:2B:28:FA:92
 # slot, 1Gb MAC 1 are

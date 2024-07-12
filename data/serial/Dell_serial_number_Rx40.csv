@@ -1,3 +1,6 @@
+# Format: <Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
+
+
 # Order 7006851, DAQ3VAL
 # PowerEdge R740, CPU Dual 6130
 4X2K3N2,00:0a:f7:bc:56:f6,,58:8a:5a:ea:3e:02
