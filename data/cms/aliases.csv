@@ -1,7 +1,7 @@
 # Format: <Device>,<IFName>,<Alias>
 
-spare-c2d11-35-01,spare-c2d11-35-01.cms,testalias1
+spare-c2d11-35-01,spare-c2d11-35-01.cms,testalias1.cms
 
-spare-c2d11-39-01,spare-c2d11-39-01.cms,aliascms2
+spare-c2d11-39-01,spare-c2d11-39-01.cms,aliascms2.cms
 spare-c2d11-39-01,spare-c2d11-39-01,aliasgpn2
 
