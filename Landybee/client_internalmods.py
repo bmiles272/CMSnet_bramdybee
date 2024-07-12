@@ -37,12 +37,11 @@ class LanDB:
         )
         self.authenticated = False
         
-        def file_older_than_9half(file): 
+        def file_older_than_9half(file):    #authentication check function, key is only valid for 10 hours hence if outwith that EXPIREDCREDENTIALS error
             file_time = path.getmtime(file) 
-            # Check against 24 hours 
             return ((time.time() - file_time) / 3600 > 9.5)
         
-        if os.path.exists('.env') and not file_older_than_9half('.env'):
+        if os.path.exists('.env') and not file_older_than_9half('.env'):   # reads and authenticates key from .env file 
             load_dotenv(find_dotenv(filename= '.env'))
             token = os.getenv('AUTH_TOKEN')
             print(token)
@@ -50,7 +49,7 @@ class LanDB:
                 self.client.set_options(soapheaders={"Auth": {"token": token}})
                 self.authenticated = True
 
-        elif username and password:
+        elif username and password:                                 #if key from .env not valid error prompts user to input username and password
             token = self.getAuthToken(username, password, "CERN")
             self.client.set_options(soapheaders={"Auth": {"token": token}})
             self.authenticated = True
