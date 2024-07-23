@@ -14,7 +14,7 @@ import suds.client  # type: ignore[import-untyped]
 import suds.xsd.doctor  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
-    from .original_landybee.types import *  # noqa: F403
+    from .types import *  # noqa: F403
 
 
 class LanDB:
