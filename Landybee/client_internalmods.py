@@ -16,7 +16,7 @@ import os.path as path
 from typing import Optional
 
 if TYPE_CHECKING:
-    from .types import *  # noqa: F403
+    from .Types.types import *  # noqa: F403
 
 
 

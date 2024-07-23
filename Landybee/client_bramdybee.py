@@ -14,7 +14,7 @@ import suds.client  # type: ignore[import-untyped]
 import suds.xsd.doctor  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
-    from .types import *  # noqa: F403
+    from .Types.types import *  # noqa: F403
 
 
 class LanDB:
