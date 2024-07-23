@@ -33,10 +33,9 @@ class LanDB:
             cache=None,
         )
         self.authenticated = False
-        self.token = None            #self.token initialised so it can be called in other functions
         if username and password:
-            self.token = self.getAuthToken(username, password, "CERN")
-            self.client.set_options(soapheaders={"Auth": {"token": self.token}})
+            token = self.getAuthToken(username, password, "CERN")
+            self.client.set_options(soapheaders={"Auth": {"token": token}})
             self.authenticated = True
         elif username or password:
             msg = "Either provide username and password, or neither"
@@ -50,12 +49,9 @@ class LanDB:
     def getAuthToken(self: Self, Login: str, Password: str, Type: str) -> str:
         return self.client.service.getAuthToken(Login, Password, Type)
     
-    def extractToken(self: Self) -> str:
-        return self.token
-    
     def filltoken(self: Self, tokenstring: str):
-        self.token = tokenstring
-        self.client.set_options(soapheaders={"Auth": {"token": self.token}})
+        token = tokenstring
+        self.client.set_options(soapheaders={"Auth": {"token": token}})
         self.authenticated = True
 
     def searchDevice(self: Self, DeviceSearch: DeviceSearch | DeviceSearchDict) -> ArrayOfString:
