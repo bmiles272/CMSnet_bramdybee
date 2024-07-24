@@ -1,4 +1,7 @@
 import pandas as pd
+import bramdybee
+
+bramDB = bramdybee.bramDB()
 
 class CMSNetCSVManager:
 
@@ -21,26 +24,15 @@ class CMSNetCSVManager:
         if len(csvfile.columns) != len(columnnames):
             raise ValueError("The number of column names does not match the number of columns in the csv file.")
 
-
-        data_dict = {}
         for index in range(len(csvfile.columns)):
             variable_name = columnnames[index]
             column_data = csvfile.iloc[:, index].tolist()
-            data_dict[variable_name] = column_data
+            globals()[variable_name] = column_data
 
-        for key, value in data_dict.items():
-            setattr(self, key, value)
-
-        print(f'You can now call the data by variable names: {columnnames}')
-        return data_dict
-        # for index in range(len(csvfile.columns)):
-        #     variable_name = columnnames[index]
-        #     column_data = csvfile.iloc[:, index].tolist()
-        #     globals()[variable_name] = column_data
-
-        # return print(f'You can now call the data by variable names: {columnnames}')
+        return print(f'You can now call the data by variable names: {columnnames}')
 
 hey = CMSNetCSVManager()
 
-aliasesdata = hey.extractcolumns(hey.importfile('aliases'), hey.aliases_columns)
-print(IFName)
+aliasesdata = hey.extractcolumns(hey.importfile('devices'), hey.devices_columns)
+
+bramDB.landb.getDeviceInfoArray(Device)
