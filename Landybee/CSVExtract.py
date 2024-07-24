@@ -1,7 +1,4 @@
 import pandas as pd
-import bramdybee
-
-bramDB = bramdybee.bramDB()
 
 class CMSNetCSVManager:
 
@@ -30,9 +27,3 @@ class CMSNetCSVManager:
             globals()[variable_name] = column_data
 
         return print(f'You can now call the data by variable names: {columnnames}')
-
-hey = CMSNetCSVManager()
-
-aliasesdata = hey.extractcolumns(hey.importfile('devices'), hey.devices_columns)
-
-bramDB.landb.getDeviceInfoArray(Device)
