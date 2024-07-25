@@ -1,4 +1,4 @@
-# Format: <Device>,<Serial>,<Zone>,<Manufacturer>,<model>,<Description>,<Tag>,<OS>,<OSversion>,<building>,<floor>,<room>,<Responsible>,<MainUser>,<ITDHCP>
+<Device>,<Serial>,<Zone>,<Manufacturer>,<model>,<Description>,<Tag>,<OS>,<OSversion>,<building>,<floor>,<room>,<Responsible>,<MainUser>,<ITDHCP>
 # <Description> and <Tag> are often not filled
 # <Responsible> and <MainUser> are often not filled either
 # <ITDHCP> inidicates that IT DHCP servers will answer to DHCP requests from this host. Normaly we leave it empty and it mean "no". Only if we explicitly want this do we say "yes"
