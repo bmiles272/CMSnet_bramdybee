@@ -1,4 +1,4 @@
-# Format: <Device>,<IFName>,<LinuxIF>,<ServiceName>,<Switch>,<Port>,<Cable>,<Speed>
+<Device>,<IFName>,<LinuxIF>,<ServiceName>,<Switch>,<Port>,<Cable>,<Speed>
 
 # Main interface is same as device name, no LinuxIF as not autoifconfig, no servicename as default one
 spare-c2d11-35-01,,,,D3562-1V-IP55-SHPYL-1414,25,25,1

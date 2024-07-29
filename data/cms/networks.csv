@@ -1,4 +1,4 @@
-# Format: <NetName>,<ServiceName>,<MTU>
+<NetName>,<ServiceName>,<MTU>
 
 # First ATCA seperated network
 atca01,S3562-1-IP56,1500

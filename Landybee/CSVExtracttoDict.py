@@ -1,150 +1,219 @@
 import os
 import pandas as pd
-from typing import Self
+from typing import List
 
 class bramtypes:
 
-    def __init__(self, files) -> None:
-        if not files:
-            raise ValueError("Undefined file name")
+    def __init__(self, file_list = None) -> None:
 
-        for file in files:
-            if not os.path.isfile(file):
-                raise FileNotFoundError(f"Failed to open locations file {file}")
         
-        self.csvfile = pd.read_csv(file, comment='#')
-        
+        self.devicescsvfile = pd.read_csv('data/cms/devices.csv', comment='#')
+        self.aliasescsvfile = pd.read_csv('data/cms/aliases.csv', comment='#')
+        self.interfacescsvfile = pd.read_csv('data/cms/interfaces.csv', comment='#')
+        self.networkscsvfile = pd.read_csv('data/cms/networks.csv', comment='#')
+        self.networks_routescsvfile = pd.read_csv('data/cms/networks_routes.csv', comment='#')
+        self.switches_special_portscsvfile = pd.read_csv('data/cms/switches_special_ports.csv', comment='#')
 
-    def location(self):
+        if file_list is None:
+            self.file_list = ['data/cms/devices.csv', 'data/cms/aliases.csv', 'data/cms/interfaces.csv', 'data/cms/networks.csv', 'data/cms/networks_routes.csv', 'data/cms/switches_special_ports.csv']  # Default file list
+        else:
+            self.file_list = file_list
+
+        # Define the mediums dictionary
+        self.mediums = {
+            "1": "GIGABITETHERNET",
+            "10": "TENGIGAETHERNET",
+            "25": "25GIGABITETHERNET",
+            "40": "40GIGABITETHERNET",
+            "50": "50GIGABITETHERNET",
+            "100": "100GIGABITETHERNET",
+            "56": "56GIGABITIB",
+            "IB": "INFINIBAND",
+            "IB-EDR": "INFINIBAND-EDR"
+        }
+
+        # Define the speeds dictionary
+        self.speeds = {
+            "1": "1000",
+            "10": "10000",
+            "25": "25000",
+            "40": "40000",
+            "50": "50000",
+            "100": "100000",
+            "56": "56000",
+            "IB": "56000",
+            "IB-EDR": "100000"
+}
+
+    def get_medium_description(self, key):
+        return self.mediums.get(key, "Unknown medium")
+
+    def get_speed_value(self, key):
+        return self.speeds.get(key, "Unknown speed")
+
+    def location(self, device_name):
         locations = []
+        csvfile = self.devicescsvfile
 
         required_columns = {'<Device>', '<building>', '<floor>', '<room>'}
-        if not required_columns.issubset(self.csvfile.columns):
+        if not required_columns.issubset(csvfile):
             raise ValueError("One or more required columns are missing in file")
 
-        for index, row in self.csvfile.iterrows():
-            location = {
-                    'DeviceName': row['<Device>'],
-                    'Building': row['<building>'],
-                    'Floor': row['<floor>'],
-                    'Room': row['<room>']
-                }
+        for index, row in csvfile.iterrows():
+            if row['<Device>'] == device_name:
+                location = {
+                        'Building': row['<building>'],
+                        'Floor': row['<floor>'],
+                        'Room': row['<room>']
+                    }
 
-            locations.append(location)
-
+                locations.append(location)
         return locations
 
-    def PersonInput(self):
+    def PersonInput(self, device_name):
         PersonInput = []
 
-        for index, row in self.csvfile.iterrows():
-            PersonInputs = {
-                    'Name': row['<Name>'] if '<Name>' in row else None,
-                    'FirstName': row['<FirstName>'] if '<FirstName>' in row else None,
-                    'Department': row['<Department>'] if '<Department>' in row else None,
-                    'Group': row['<Group>'] if '<Group>' in row else None,
-                    'PersonID': row['<PersonID>'] if '<PersonID>' in row else None
-                }
+        csvfile = self.devicescsvfile
 
-            PersonInput.append(PersonInputs)
+        for index, row in csvfile.iterrows():
+            if row['<Device>'] == device_name:
+                PersonInputs = {
+                        'Name': row['<MainUser>'] if '<MainUser>' in row else None,
+                        'FirstName': row['<FirstName>'] if '<FirstName>' in row else None,
+                        'Department': row['<Department>'] if '<Department>' in row else None,
+                        'Group': row['<Group>'] if '<Group>' in row else None,
+                        'PersonID': row['<PersonID>'] if '<PersonID>' in row else None
+                    }
+                        
+                PersonInput.append(PersonInputs)
         return PersonInput
 
-    def OperatingSystem(self):
+    def OperatingSystem(self, device_name):
         OS = []
+        csvfile = self.devicescsvfile
 
         required_columns = {'<OS>', '<OSversion>'}
-        if not required_columns.issubset(self.csvfile.columns):
+        if not required_columns.issubset(csvfile):
             raise ValueError("One or more required columns are missing in file")
 
-        for index, row in self.csvfile.iterrows():
-            OpSys = {
-                    'Name': row['<OS>'],
-                    'Version': row['<OSversion>']
-                }
-
-            OS.append(OpSys)
+        for index, row in csvfile.iterrows():
+            if row['<Device>'] == device_name:
+                OpSys = {
+                        'Name': row['<OS>'],
+                        'Version': row['<OSversion>']
+                    }
+        
+                OS.append(OpSys)
         return OS
+    
+    def IPAliasList(self, device_name):
+        IPAList = []
+        device_rows = self.aliasescsvfile[self.aliasescsvfile['<Device>'] == device_name]
 
-    def InterfaceCard(self):
+        for index, row in device_rows.iterrows():
+            alias = row['<Alias>'] if '<Alias>' in row else None
+            if alias is not None:
+                IPAList.append(alias)
+        return IPAList
+
+    def InterfaceCard(self, device_name):
         IFcard = []
 
-        required_columns = {'<>', '<>'}
-        if not required_columns.issubset(self.csvfile.columns):
-            raise ValueError("One or more required columns are missing in file")
+        for file_path in self.file_list:
+            device_rows = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
 
-        for index, row in self.csvfile.iterrows():
-            IFCards = {
-                    'HardwareAddress': row['<>'],
-                    'CardType': row['<>']
-                }
+            for index, row in device_rows.iterrows():
+                IFCards = {
+                        'HardwareAddress': row['<HardwareAddress>'] if '<HardwareAddress>' in row else None,
+                        'CardType': row['<CardType>'] if '<CardType>' in row else "Ethernet"
+                    }
 
-            IFcard.append(IFCards)
+                IFcard.append(IFCards)
         return IFcard
 
-    def DeviceInput(self):
+    def DeviceInput(self, device_name):
         deviceinput = []
 
         required_columns = {'<Device>', '<Manufacturer>', '<model>'}
-        if not required_columns.issubset(self.csvfile.columns):
-            raise ValueError("One or more required columns are missing in file")
 
-        for index, row in self.csvfile.iterrows():
-            devinp = {
-                    'DeviceName': row['<Device>'],
-                    'Location': self.location()[0],
-                    'Zone': row['<Zone>'] if '<Zone>' in row else None,
-                    'Manufacturer': row['<Manufacturer>'],
-                    'Model': row['<model>'],
-                    'Description': row['<Description>'] if '<Description>' in row else None,
-                    'Tag': row['<Tag>'] if '<Tag>' in row else None,
-                    'SerialNumber': row['<>'] if '<>' in row else None,
-                    'OperatingSystem': self.OperatingSystem()[0],
-                    'InventoryNumber': row['<>'] if '<>' in row else None,
-                    'LandbManagerPerson': self.PersonInput()[0] if self.PersonInput != None else None,
-                    'ResponsiblePerson': self.PersonInput()[0],
-                    'UserPerson': self.PersonInput()[0] if self.PersonInput != None else None,
-                    'HCPResponse': row['<>'] if '<>' in row else None,
-                    'IPv6Ready': row['<>'] if '<>' in row else None,
-                    'ManagerLocked': row['<>'] if '<>' in row else None,
-                }
+        for file_path in self.file_list:
+            try:
+                csvfile = pd.read_csv(file_path, comment='#')
+                if not required_columns.issubset(csvfile.columns):
+                    continue
 
-            deviceinput.append(devinp)
+                device_rows = csvfile[csvfile['<Device>'] == device_name]
+
+                for index, row in device_rows.iterrows():
+                    devinp = {
+                            'DeviceName': device_name,
+                            'Location': self.location(device_name),
+                            'Zone': row['<Zone>'] if '<Zone>' in row else None,
+                            'Manufacturer': row['<Manufacturer>'],
+                            'Model': row['<model>'],
+                            'Description': row['<Description>'] if '<Description>' in row else None,
+                            'Tag': row['<Tag>'] if '<Tag>' in row else None,
+                            'SerialNumber': row['<SerialNumber>'] if '<SerialNumber>' in row else None,
+                            'OperatingSystem': self.OperatingSystem(device_name),
+                            'InventoryNumber': row['<InventoryNumber>'] if '<InventoryNumber>' in row else None,
+                            'LandbManagerPerson': self.PersonInput(device_name) if self.PersonInput != None else None,
+                            'ResponsiblePerson': self.PersonInput(device_name),
+                            'UserPerson': self.PersonInput(device_name) if self.PersonInput != None else None,
+                            'HCPResponse': row['<HCPResponse>'] if '<HCPResponse>' in row else None,
+                            'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
+                            'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
+                        }
+
+                    deviceinput.append(devinp)
+
+            except Exception as e:
+                    print(f"An error occurred while processing file {file_path}: {e}")
         return deviceinput
     
-    def BulkInterface(self):
+    def BulkInterface(self, device_name):
         BulkIF = []
 
-        required_columns = {'<OutletLabel>', '<SecurityClass>', '<InternetConnectivity>', '<Medium>', '<SwicthName>', '<PortNumber>', '<PortName>', '<CableNumber>'}
-        if not required_columns.issubset(self.csvfile.columns):
-            raise ValueError("One or more required columns are missing in file")
+        required_columns = {'<IFName>', '<OutletLabel>', '<SecurityClass>', '<InternetConnectivity>', '<Medium>', '<Switch>', '<Port>', '<Cable>'}
+                
+        device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
+                
+        for index, row in device_rows.iterrows():
+                BInterface = {
+                            'InterfaceName': row['<IFName>'] if '<IFName>' != None in row else device_name + '.cms',
+                            'IPAlaises': self.IPAliasList(device_name) if self.IPAliasList != '[]' else None,
+                            'Location': self.location(device_name), 
+                            'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
+                            'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
+                            'InternetConnectivity': row['<InternetConnectivity>'] if '<InternetConnectivity>' in row else None,
+                            'Medium': self.get_medium_description(row['<Medium>']) if '<Medium>' in row else "GIGABITETHERNET",
+                            'SwitchName': row['<Switch>'],
+                            'PortNumber': row['<Port>'],
+                            'CableNumber': row['<Cable>'],
+                            'IP': row['<IP>'] if '<IP>' in row else None,
+                            'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
+                            'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
+                        }
 
-        for index, row in self.csvfile.iterrows():
-            BInterface = {
-                    'InterfaceName': row['<>'] if '<>' in row else None,
-                    'IPAlaises': list(row['<>']) if '<>' in row else None,
-                    'Location': self.location(), 
-                    'OutletLabel': row['<>'],
-                    'SecurityClass': row['<>'],
-                    'InternetConnectivity': row['<Description>'],
-                    'Medium': row['<>'],
-                    'SwitchName': row['<>'],
-                    'PortNumber': row['<>'],
-                    'CableNumber': row['<>'],
-                    'IP': row['<>'] if '<>' in row else None,
-                    'IPv6': row['<>'] if '<>' in row else None,
-                    'ServiceName': row['<>'] if '<>' in row else None
-                }
-
-            BulkIF.append(BInterface)
+                BulkIF.append(BInterface)
         return BulkIF
 
+    def search_device_info(self):
 
-#to create dict in the format needed by landybee functions do the following
-#list files
-# file_paths = ['data/cms/devices.csv']
+        alldevice_info = []
+        device_names = self.devicescsvfile['<Device>'].unique()
+            
+        for device_name in device_names:
 
-#create instance of bramtypes class
-# bram = bramtypes(file_paths)
+            device_info = {
+                'DeviceInput': self.DeviceInput(device_name),
+                'BulkInterface': self.BulkInterface(device_name),
+                'Interfaces': None,
+                'InterfaceCards': self.InterfaceCard(device_name)
 
-#call functions
-# locations = bram.location()
+            }
+            alldevice_info.append(device_info)
+
+        return alldevice_info
+
+bramtype = bramtypes()
+print(bramtype.search_device_info()[0])

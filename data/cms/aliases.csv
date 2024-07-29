@@ -1,4 +1,4 @@
-# Format: <Device>,<IFName>,<Alias>
+<Device>,<IFName>,<Alias>
 
 spare-c2d11-35-01,spare-c2d11-35-01.cms,testalias1.cms
 
