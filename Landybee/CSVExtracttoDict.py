@@ -1,8 +1,7 @@
-import os
 import pandas as pd
 from typing import List
 
-class bramtypes:
+class CSVtypes:
 
     def __init__(self, file_list = None) -> None:
 
@@ -49,7 +48,8 @@ class bramtypes:
         return self.mediums.get(key, "Unknown medium")
 
     def get_speed_value(self, key):
-        return self.speeds.get(key, "Unknown speed")
+        cleaned_key = str(key).strip()
+        return self.speeds.get(cleaned_key, "Unknown speed")
 
     def location(self, device_name):
         locations = []
@@ -106,14 +106,22 @@ class bramtypes:
                 OS.append(OpSys)
         return OS
     
-    def IPAliasList(self, device_name):
+    def IPAliasList(self, device_name = None, interface_name = None):
         IPAList = []
         device_rows = self.aliasescsvfile[self.aliasescsvfile['<Device>'] == device_name]
 
-        for index, row in device_rows.iterrows():
-            alias = row['<Alias>'] if '<Alias>' in row else None
-            if alias is not None:
-                IPAList.append(alias)
+        if interface_name == None:
+            for index, row in device_rows.iterrows():
+                alias = row['<Alias>'] if '<Alias>' in row else None
+                if alias is not None:
+                    IPAList.append(alias)
+        else:
+            aliases_rows = device_rows[device_rows['<IFName>'] == interface_name]
+            for index, row in aliases_rows.iterrows():
+                alias = row['<Alias>'] if '<Alias>' in row else None
+                if alias is not None:
+                    IPAList.append(alias)
+            
         return IPAList
 
     def InterfaceCard(self, device_name):
@@ -130,16 +138,33 @@ class bramtypes:
 
                 IFcard.append(IFCards)
         return IFcard
+    
+    def interface_list(self, device_name):
+        interfaceslist = []
+        device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
 
-    def DeviceInput(self, device_name):
+        for index, row in device_rows.iterrows():
+            interface_name = row['<IFName>'] if '<IFName>' in row else None
+            if pd.isna(interface_name):
+                interface_name = f"{device_name}.cms"
+                interfaceslist.append(interface_name)
+            else:
+                interfaceslist.append(interface_name)
+        return interfaceslist
+
+    def DeviceInput(self, device_name = None):
         deviceinput = []
-
+        device_names = set()  
         required_columns = {'<Device>', '<Manufacturer>', '<model>'}
 
         for file_path in self.file_list:
             try:
                 csvfile = pd.read_csv(file_path, comment='#')
                 if not required_columns.issubset(csvfile.columns):
+                    continue
+
+                if device_name is None:
+                    device_names.update(csvfile['<Device>'].unique())
                     continue
 
                 device_rows = csvfile[csvfile['<Device>'] == device_name]
@@ -170,17 +195,18 @@ class bramtypes:
                     print(f"An error occurred while processing file {file_path}: {e}")
         return deviceinput
     
-    def BulkInterface(self, device_name):
-        BulkIF = []
-
-        required_columns = {'<IFName>', '<OutletLabel>', '<SecurityClass>', '<InternetConnectivity>', '<Medium>', '<Switch>', '<Port>', '<Cable>'}
+    def Interfaces(self, device_name):
+        IF = []
+        interface_list = self.interface_list(device_name)
+        IF.append(f"Interfaces: {interface_list}")
                 
         device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
                 
         for index, row in device_rows.iterrows():
-                BInterface = {
-                            'InterfaceName': row['<IFName>'] if '<IFName>' != None in row else device_name + '.cms',
-                            'IPAlaises': self.IPAliasList(device_name) if self.IPAliasList != '[]' else None,
+                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms'
+                Interface = {
+                            'InterfaceName': interface_name,
+                            'IPAlais': self.IPAliasList(device_name= device_name, interface_name= interface_name) if self.IPAliasList(device_name= device_name, interface_name= interface_name) != '[]' else None,
                             'Location': self.location(device_name), 
                             'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
                             'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
@@ -193,27 +219,73 @@ class bramtypes:
                             'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
                             'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
                         }
-
+                IF.append(Interface)
+        return IF
+    
+    def BulkInterface(self, device_name):
+        BulkIF = []
+                
+        device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
+                
+        for index, row in device_rows.iterrows():
+                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms'
+                BInterface = {
+                            'InterfaceName': interface_name,
+                            'IPAlais': self.IPAliasList(device_name= device_name) if self.IPAliasList(device_name= device_name) != '[]' else None,
+                            'Location': self.location(device_name), 
+                            'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
+                            'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
+                            'InternetConnectivity': row['<InternetConnectivity>'] if '<InternetConnectivity>' in row else False,
+                            'Medium': self.get_medium_description(row['<Medium>']) if '<Medium>' in row else "GIGABITETHERNET",
+                            'SwitchName': row['<Switch>'],
+                            'PortNumber': row['<Port>'],
+                            'CableNumber': row['<Cable>'],
+                            'IP': row['<IP>'] if '<IP>' in row else None,
+                            'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
+                            'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
+                        }
                 BulkIF.append(BInterface)
         return BulkIF
 
-    def search_device_info(self):
+    def search_device_info(self, device_name = None):
 
         alldevice_info = []
-        device_names = self.devicescsvfile['<Device>'].unique()
+
+        if device_name == None:
+            device_names = self.devicescsvfile['<Device>'].unique()
             
-        for device_name in device_names:
+            for device_name in device_names:
 
+                device_info = {
+                    'DeviceInput': self.DeviceInput(device_name),
+                    'BulkInterface': self.BulkInterface(device_name),
+                    'Interfaces': self.Interfaces(device_name),
+                    'NetworkInterfaceCards': self.InterfaceCard(device_name)
+
+                }
+                alldevice_info.append(device_info)
+        
+        else:
             device_info = {
-                'DeviceInput': self.DeviceInput(device_name),
-                'BulkInterface': self.BulkInterface(device_name),
-                'Interfaces': None,
-                'InterfaceCards': self.InterfaceCard(device_name)
+                    'DeviceInput': self.DeviceInput(device_name),
+                    'BulkInterface': self.BulkInterface(device_name),
+                    'Interfaces': self.Interfaces(device_name),
+                    'InterfaceCards': self.InterfaceCard(device_name)
 
-            }
+                }
+        
             alldevice_info.append(device_info)
 
         return alldevice_info
 
-bramtype = bramtypes()
-print(bramtype.search_device_info()[0])
+''' checks '''
+# bramtype = bramtypes()
+# device = 'spare-c2d11-39-01'
+# # print(bramtype.Interfaces('spare-c2d11-40-01'))
+# # print(bramtype.DeviceInput(device))
+# print('')
+# # print(bramtype.BulkInterface(device))
+# print('')
+# print(bramtype.Interfaces(device))
+# print('')
+# # print(bramtype.InterfaceCard(device))
