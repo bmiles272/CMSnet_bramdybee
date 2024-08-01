@@ -1,11 +1,18 @@
 import pandas as pd
 from typing import List
+'''
+Object which transforms the data from CMS CSV device files into python dictionaries for the types.py file used by landybee in order to
+alter LanDB entries. Some types require dictionaries within dictionaries, for example the DeviceInput requires a location 'dictionary' within it.
+'''
+
 
 class CSVtypes:
 
     def __init__(self, file_list = None) -> None:
-
         
+        '''
+        Call all .csv files whihc are used throughout the functions, a list is also generated as some functions require data from more than one file.
+        '''
         self.devicescsvfile = pd.read_csv('data/cms/devices.csv', comment='#')
         self.aliasescsvfile = pd.read_csv('data/cms/aliases.csv', comment='#')
         self.interfacescsvfile = pd.read_csv('data/cms/interfaces.csv', comment='#')
@@ -18,7 +25,7 @@ class CSVtypes:
         else:
             self.file_list = file_list
 
-        # Define the mediums dictionary
+        # Define the mediums key readable table
         self.mediums = {
             "1": "GIGABITETHERNET",
             "10": "TENGIGAETHERNET",
@@ -31,7 +38,7 @@ class CSVtypes:
             "IB-EDR": "INFINIBAND-EDR"
         }
 
-        # Define the speeds dictionary
+        # Define the speeds key readable table
         self.speeds = {
             "1": "1000",
             "10": "10000",
@@ -43,7 +50,7 @@ class CSVtypes:
             "IB": "56000",
             "IB-EDR": "100000"
 }
-
+    #Extract keys and input true values from medium and speed tables.
     def get_medium_description(self, key):
         return self.mediums.get(key, "Unknown medium")
 
@@ -51,6 +58,7 @@ class CSVtypes:
         cleaned_key = str(key).strip()
         return self.speeds.get(cleaned_key, "Unknown speed")
 
+    #location dictionary, pointing to location of device in building, floor, room format
     def location(self, device_name):
         locations = []
         csvfile = self.devicescsvfile
@@ -70,6 +78,7 @@ class CSVtypes:
                 locations.append(location)
         return locations
 
+    #person input dictionary points to owner of device and their information
     def PersonInput(self, device_name):
         PersonInput = []
 
@@ -106,6 +115,7 @@ class CSVtypes:
                 OS.append(OpSys)
         return OS
     
+    #IP alias list, as a device can have more than 1 interface each interface can have its own alias
     def IPAliasList(self, device_name = None, interface_name = None):
         IPAList = []
         device_rows = self.aliasescsvfile[self.aliasescsvfile['<Device>'] == device_name]
@@ -152,9 +162,9 @@ class CSVtypes:
                 interfaceslist.append(interface_name)
         return interfaceslist
 
-    def DeviceInput(self, device_name = None):
+
+    def DeviceInput(self, device_name=None):
         deviceinput = []
-        device_names = set()  
         required_columns = {'<Device>', '<Manufacturer>', '<model>'}
 
         for file_path in self.file_list:
@@ -164,13 +174,33 @@ class CSVtypes:
                     continue
 
                 if device_name is None:
-                    device_names.update(csvfile['<Device>'].unique())
-                    continue
-
-                device_rows = csvfile[csvfile['<Device>'] == device_name]
-
-                for index, row in device_rows.iterrows():
-                    devinp = {
+                    device_names = csvfile['<Device>'].unique()
+                    for device in device_names:
+                        device_rows = csvfile[csvfile['<Device>'] == device]
+                        for index, row in device_rows.iterrows():
+                            devinp = {
+                                'DeviceName': device,
+                                'Location': self.location(device),
+                                'Zone': row['<Zone>'] if '<Zone>' in row else None,
+                                'Manufacturer': row['<Manufacturer>'],
+                                'Model': row['<model>'],
+                                'Description': row['<Description>'] if '<Description>' in row else None,
+                                'Tag': row['<Tag>'] if '<Tag>' in row else None,
+                                'SerialNumber': row['<SerialNumber>'] if '<SerialNumber>' in row else None,
+                                'OperatingSystem': self.OperatingSystem(device),
+                                'InventoryNumber': row['<InventoryNumber>'] if '<InventoryNumber>' in row else None,
+                                'LandbManagerPerson': self.PersonInput(device) if self.PersonInput != None else None,
+                                'ResponsiblePerson': self.PersonInput(device),
+                                'UserPerson': self.PersonInput(device) if self.PersonInput != None else None,
+                                'HCPResponse': row['<HCPResponse>'] if '<HCPResponse>' in row else None,
+                                'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
+                                'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
+                            }
+                            deviceinput.append(devinp)
+                else:
+                    device_rows = csvfile[csvfile['<Device>'] == device_name]
+                    for index, row in device_rows.iterrows():
+                        devinp = {
                             'DeviceName': device_name,
                             'Location': self.location(device_name),
                             'Zone': row['<Zone>'] if '<Zone>' in row else None,
@@ -188,17 +218,18 @@ class CSVtypes:
                             'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
                             'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
                         }
-
-                    deviceinput.append(devinp)
+                        deviceinput.append(devinp)
 
             except Exception as e:
-                    print(f"An error occurred while processing file {file_path}: {e}")
+                print(f"An error occurred while processing file {file_path}: {e}")
+    
         return deviceinput
+
     
     def Interfaces(self, device_name):
         IF = []
-        interface_list = self.interface_list(device_name)
-        IF.append(f"Interfaces: {interface_list}")
+        # interface_list = self.interface_list(device_name)
+        # IF.append(f"Interfaces: {interface_list}")
                 
         device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
                 
@@ -258,7 +289,7 @@ class CSVtypes:
 
                 device_info = {
                     'DeviceInput': self.DeviceInput(device_name),
-                    'BulkInterface': self.BulkInterface(device_name),
+                    # 'BulkInterface': self.BulkInterface(device_name),
                     'Interfaces': self.Interfaces(device_name),
                     'NetworkInterfaceCards': self.InterfaceCard(device_name)
 
@@ -279,13 +310,13 @@ class CSVtypes:
         return alldevice_info
 
 ''' checks '''
-# bramtype = bramtypes()
-# device = 'spare-c2d11-39-01'
-# # print(bramtype.Interfaces('spare-c2d11-40-01'))
-# # print(bramtype.DeviceInput(device))
+bramtype = CSVtypes()
+device = 'spare-c2d11-39-01'
+# print(bramtype.Interfaces('spare-c2d11-40-01'))
+# print(bramtype.DeviceInput())
 # print('')
-# # print(bramtype.BulkInterface(device))
+print(bramtype.BulkInterface(device))
 # print('')
 # print(bramtype.Interfaces(device))
 # print('')
-# # print(bramtype.InterfaceCard(device))
+# print(bramtype.InterfaceCard(device))
