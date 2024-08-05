@@ -1,4 +1,4 @@
-# Format: <Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
+<Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
 
 
 # Order 7006851, DAQ3VAL

@@ -1,4 +1,4 @@
-# Format: <Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
+<Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
 
 
 # 6th order from Dell, 2017/12/20 for Rx30 machines

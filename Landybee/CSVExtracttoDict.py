@@ -3,6 +3,8 @@ from typing import List
 '''
 Object which transforms the data from CMS CSV device files into python dictionaries for the types.py file used by landybee in order to
 alter LanDB entries. Some types require dictionaries within dictionaries, for example the DeviceInput requires a location 'dictionary' within it.
+Difference between BulkInterface and Interfaces is that BulkInterface is in the format required by types.py, the interfaces fucntion simply lists
+the interfaces, info and their associated aliases (bulkinterface requires a list of aliases).
 '''
 
 
@@ -24,6 +26,14 @@ class CSVtypes:
             self.file_list = ['data/cms/devices.csv', 'data/cms/aliases.csv', 'data/cms/interfaces.csv', 'data/cms/networks.csv', 'data/cms/networks_routes.csv', 'data/cms/switches_special_ports.csv']  # Default file list
         else:
             self.file_list = file_list
+
+        #import serial files and combine them since they have equal columns
+        self.DSNblades = pd.read_csv('data/serial/Dell_serial_number_blades.csv', comment= '#')
+        self.DSNRx30 = pd.read_csv('data/serial/Dell_serial_number_Rx30.csv', comment= '#')
+        self.DSNRx40 = pd.read_csv('data/serial/Dell_serial_number_Rx40.csv', comment= '#')
+        self.magauySN = pd.read_csv('data/serial/maguay_serial_number.csv', comment= '#')
+
+        self.serials = pd.concat([self.DSNblades, self.DSNRx30, self.DSNRx40, self.magauySN])
 
         # Define the mediums key readable table
         self.mediums = {
@@ -122,13 +132,13 @@ class CSVtypes:
 
         if interface_name == None:
             for index, row in device_rows.iterrows():
-                alias = row['<Alias>'] if '<Alias>' in row else None
+                alias = row['<Alias>'] + '.cms.cern.ch' if '<Alias>' in row else None
                 if alias is not None:
                     IPAList.append(alias)
         else:
             aliases_rows = device_rows[device_rows['<IFName>'] == interface_name]
             for index, row in aliases_rows.iterrows():
-                alias = row['<Alias>'] if '<Alias>' in row else None
+                alias = row['<Alias>'] + '.cms.cern.ch' if '<Alias>' in row else None
                 if alias is not None:
                     IPAList.append(alias)
             
@@ -137,16 +147,15 @@ class CSVtypes:
     def InterfaceCard(self, device_name):
         IFcard = []
 
-        for file_path in self.file_list:
-            device_rows = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
+        device_rows = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
 
-            for index, row in device_rows.iterrows():
-                IFCards = {
-                        'HardwareAddress': row['<HardwareAddress>'] if '<HardwareAddress>' in row else None,
-                        'CardType': row['<CardType>'] if '<CardType>' in row else "Ethernet"
+        for index, row in device_rows.iterrows():
+            IFCards = {
+                    'HardwareAddress': self.MACaddress(device_name)['OnboardMAC1'] if self.MACaddress(device_name)['OnboardMAC1'] != None else self.MACaddress['OnboardMAC2'],
+                    'CardType': row['<CardType>'] if '<CardType>' in row else "Ethernet"
                     }
 
-                IFcard.append(IFCards)
+            IFcard.append(IFCards)
         return IFcard
     
     def interface_list(self, device_name):
@@ -164,7 +173,6 @@ class CSVtypes:
 
 
     def DeviceInput(self, device_name=None):
-        deviceinput = []
         required_columns = {'<Device>', '<Manufacturer>', '<model>'}
 
         for file_path in self.file_list:
@@ -196,7 +204,6 @@ class CSVtypes:
                                 'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
                                 'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
                             }
-                            deviceinput.append(devinp)
                 else:
                     device_rows = csvfile[csvfile['<Device>'] == device_name]
                     for index, row in device_rows.iterrows():
@@ -218,12 +225,11 @@ class CSVtypes:
                             'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
                             'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
                         }
-                        deviceinput.append(devinp)
 
             except Exception as e:
                 print(f"An error occurred while processing file {file_path}: {e}")
     
-        return deviceinput
+        return devinp
 
     
     def Interfaces(self, device_name):
@@ -234,7 +240,7 @@ class CSVtypes:
         device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
                 
         for index, row in device_rows.iterrows():
-                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms'
+                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms.cern.ch'
                 Interface = {
                             'InterfaceName': interface_name,
                             'IPAlais': self.IPAliasList(device_name= device_name, interface_name= interface_name) if self.IPAliasList(device_name= device_name, interface_name= interface_name) != '[]' else None,
@@ -253,16 +259,15 @@ class CSVtypes:
                 IF.append(Interface)
         return IF
     
-    def BulkInterface(self, device_name):
-        BulkIF = []
-                
+    def BulkInterface(self, device_name): 
+        interfaces = []               
         device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
                 
         for index, row in device_rows.iterrows():
-                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms'
+                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms.cern.ch'
                 BInterface = {
                             'InterfaceName': interface_name,
-                            'IPAlais': self.IPAliasList(device_name= device_name) if self.IPAliasList(device_name= device_name) != '[]' else None,
+                            'IPAliases': self.IPAliasList(device_name= device_name) if self.IPAliasList(device_name= device_name) != '[]' else None,
                             'Location': self.location(device_name), 
                             'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
                             'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
@@ -275,8 +280,8 @@ class CSVtypes:
                             'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
                             'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
                         }
-                BulkIF.append(BInterface)
-        return BulkIF
+                interfaces.append(BInterface)
+        return interfaces
 
     def search_device_info(self, device_name = None):
 
@@ -289,7 +294,7 @@ class CSVtypes:
 
                 device_info = {
                     'DeviceInput': self.DeviceInput(device_name),
-                    # 'BulkInterface': self.BulkInterface(device_name),
+                    'BulkInterface': self.BulkInterface(device_name),
                     'Interfaces': self.Interfaces(device_name),
                     'NetworkInterfaceCards': self.InterfaceCard(device_name)
 
@@ -308,15 +313,36 @@ class CSVtypes:
             alldevice_info.append(device_info)
 
         return alldevice_info
+    
+    def MACaddress(self, device_name):
+        deviceserial = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
+        serialnumber = deviceserial['<Serial>'].values[0]
+        try: 
+            mac = self.serials[self.serials['<Serial>'] == serialnumber]
+            if mac.empty:
+                print(f"serial number not found in serials CSV file")
+                return None
+            macaddresses = {
+                'OnboardMAC1': mac['<OnboardMAC1>'].values[0] if '<OnboardMAC1>' in mac and not pd.isna(mac['<OnboardMAC1>'].values[0]) else None,
+                'OnboardMAC2': mac['<OnboardMAC2>'].values[0] if '<OnboardMAC2>' in mac and not pd.isna(mac['<OnboardMAC2>'].values[0]) else None,
+                'IPMIMAC': mac['<IPMIMAC>'].values[0] if '<IPMIMAC>' in mac and not pd.isna(mac['<IPMIMAC>'].values[0]) else None
+                    }
+            return macaddresses
+        except Exception as e:
+            print(f"Serial number {serialnumber} for device {device_name} is not found or does not have a MAC address: {e}")
+            
+         
 
-''' checks '''
-bramtype = CSVtypes()
-device = 'spare-c2d11-39-01'
+''' for example '''
+# bramtype = CSVtypes()
+# device = 'spare-c2d11-39-01'
 # print(bramtype.Interfaces('spare-c2d11-40-01'))
 # print(bramtype.DeviceInput())
 # print('')
-print(bramtype.BulkInterface(device))
+# print(bramtype.BulkInterface(device))
 # print('')
 # print(bramtype.Interfaces(device))
 # print('')
+# print(bramtype.InterfaceCard(device))
+
 # print(bramtype.InterfaceCard(device))

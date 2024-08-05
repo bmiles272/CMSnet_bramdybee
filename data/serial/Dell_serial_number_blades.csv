@@ -1,4 +1,4 @@
-# Format: <Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
+<Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
 
 
 # Blade Chassis in C2E41-30 with the MACs

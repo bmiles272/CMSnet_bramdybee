@@ -16,9 +16,10 @@ class bramDB():
         self.authenticate()
 
     def write_env(self, token) -> str:
-        with open('.env', 'w') as file:
+        name = '.env'
+        with open(name, 'w') as file:
             file.write('AUTH_TOKEN=' + token)
-        return 'file .env created and token inputted'
+        return print('file .env created and token inputted, be careful not to push .env file into directory')
 
     def file_older_than_9half(self, file): 
         '''
