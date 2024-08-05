@@ -60,7 +60,6 @@ class LanDB:
             load_dotenv(find_dotenv(filename= '.env'))
             print(type(os.getenv('AUTH_TOKEN')))
                 
-
         elif username or password:
             msg = "Either provide username and password, or neither"
             raise ValueError(msg)
