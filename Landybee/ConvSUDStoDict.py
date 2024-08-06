@@ -1,3 +1,8 @@
+'''
+Python code found online to convert suds object which are produced by the landybee SOAP functions into python dictionaries for easy comparison.
+code source: https://gist.github.com/checkaayush/915d2600d696e818349bb1c955ebdcf8 
+'''
+
 class SUDS2Dict:
 
     def __init__(self) -> None:

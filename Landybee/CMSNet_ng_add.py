@@ -17,7 +17,7 @@ bramdb = bramdybee.bramDB()
 When instance of class is called all 3 functions automatically are used. As if we used the bulkInsert function. 
 However each function is also callable individually.
 '''
-class add_device:
+class cmsnet_add:
 
     def __init__(self, device_name) -> None:
         #Call in dicts from CSVExtracttoDict
@@ -41,14 +41,15 @@ class add_device:
                 print(f"Successfully added Network Interface Card (NIC) for device {self.device_name}.")
         except Exception as e:
             print(f"There was an ERROR adding Network Interface Card (NIC) for device {self.device_name}: {e}")
-        return
     
     def deviceAddBulkInterface(self):
-        for interface in self.bulk_interface:
+        for index, interface in enumerate(self.bulk_interface):
             IFName = interface.get("InterfaceName")
             switch_name = interface.get("SwitchName")
             switchnumber = interface.get("PortNumber")
             hardware_address = extract_dict.MACaddress(self.device_name)
+            port_name = interface.get("PortNumber")
+
             try:
                 #check switch information, of port is already in use we use a fanout.
                 switch_info_list = bramdb.landb.getSwitchInfo(switch_name)
@@ -63,11 +64,11 @@ class add_device:
                     if switch_info.InUse == True:
                         print(f"Switch in use, turning switchport {switch_name} into a fanout...")
                         try:
-                            fanout = bramdb.landb.enableFanOutFromSwitchPort(switch_name)
+                            fanout = bramdb.landb.enableFanOutFromSwitchPort(switch_name, port_name)
                             if fanout == True:
                                 print(f"Fanout for switchport {switch_name} created succesfully.")
                         except Exception as fanout_error:
-                            print(f"Fanout failed,. Trying to continue as it could already be a fanout: {fanout_error}")
+                            print(f"Fanout failed. Trying to continue as it could already be a fanout: {fanout_error}")
                 else:
                     print(f"No switch info found for device name {self.device_name}.")
 
@@ -76,21 +77,31 @@ class add_device:
 
             try:
                 bramdb.landb.deviceAddBulkInterface(self.device_name, interface)
-                print(f"Successfully added Interface for device {self.device_name}.")
+                print(f"Successfully added Interface {IFName} for device {self.device_name}.")
             except Exception as e:
                 print(f"There was an ERROR adding Bulk Interface {IFName} for device {self.device_name}: {e}")
             
+            if index == 0:
+                first_interface = interface
+
+        #binds NIC to interface of device rather than extra ones as device interface will always be first one
+        if first_interface:
+            IFName = first_interface.get("InterfaceName")    
             try:
-                bind = bramdb.landb.bindUnbindInterface(IFName, hardware_address)
-                if bind == True:
-                    return print(f"Interface succesfully binded to hardware address {hardware_address}")
+                macaddress = hardware_address.get('OnboardMAC1') or hardware_address.get('OnboardMAC2')
+                if macaddress:
+                    bind = bramdb.landb.bindUnbindInterface(IFName, macaddress)
+                    if bind:
+                        print(f"Interface successfully bound to hardware address {macaddress}.")
+                    else:
+                        print(f"Failed to bind interface {IFName} to hardware address {macaddress}.")
+                else:
+                    print(f"No valid MAC address found for interface {IFName}.")
             except Exception as e:
-                print(f"ERROR binding interface {IFName} to {hardware_address}: {e}")
+                print(f"ERROR binding interface {IFName} to {macaddress}: {e}")
         
     #Call function is what allows all 3 functions to be used when instance of add_device is called in combination with a device name.
     def __call__(self) -> Any:
         self.deviceInsert()
         self.deviceAddCard()
         self.deviceAddBulkInterface()
-        return print(f"full device {self.device_name} added. :)")
-

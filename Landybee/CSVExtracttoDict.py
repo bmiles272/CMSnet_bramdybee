@@ -28,12 +28,15 @@ class CSVtypes:
             self.file_list = file_list
 
         #import serial files and combine them since they have equal columns
-        self.DSNblades = pd.read_csv('data/serial/Dell_serial_number_blades.csv', comment= '#')
-        self.DSNRx30 = pd.read_csv('data/serial/Dell_serial_number_Rx30.csv', comment= '#')
-        self.DSNRx40 = pd.read_csv('data/serial/Dell_serial_number_Rx40.csv', comment= '#')
-        self.magauySN = pd.read_csv('data/serial/maguay_serial_number.csv', comment= '#')
+        file_paths = [
+            'data/serial/Dell_serial_number_blades.csv',
+            'data/serial/Dell_serial_number_Rx30.csv',
+            'data/serial/Dell_serial_number_Rx40.csv',
+            'data/serial/maguay_serial_number.csv'
+        ]
 
-        self.serials = pd.concat([self.DSNblades, self.DSNRx30, self.DSNRx40, self.magauySN])
+        readserial = [pd.read_csv(file, comment= '#') for file in file_paths]
+        self.serials = pd.concat(readserial, ignore_index = True)
 
         # Define the mediums key readable table
         self.mediums = {
@@ -60,9 +63,13 @@ class CSVtypes:
             "IB": "56000",
             "IB-EDR": "100000"
 }
+        #define global cms domain
+        self.domain = '--cms.cern.ch'
+
     #Extract keys and input true values from medium and speed tables.
     def get_medium_description(self, key):
-        return self.mediums.get(key, "Unknown medium")
+        cleaned_key = str(key).strip()
+        return self.mediums.get(cleaned_key, "Unknown medium")
 
     def get_speed_value(self, key):
         cleaned_key = str(key).strip()
@@ -97,8 +104,9 @@ class CSVtypes:
         for index, row in csvfile.iterrows():
             if row['<Device>'] == device_name:
                 PersonInputs = {
-                        'Name': row['<MainUser>'] if '<MainUser>' in row else None,
-                        'FirstName': row['<FirstName>'] if '<FirstName>' in row else None,
+                        'Name': "CMS-NET-ADMINS" if '<OS>' != 'Windows' else "CMS-NET-DCS",
+                        # 'Name': row['<MainUser>'] if '<MainUser>'in row else "CMS-NET-ADMINS",
+                        'FirstName': row['<FirstName>'] if '<FirstName>' in row else "E-GROUP",
                         'Department': row['<Department>'] if '<Department>' in row else None,
                         'Group': row['<Group>'] if '<Group>' in row else None,
                         'PersonID': row['<PersonID>'] if '<PersonID>' in row else None
@@ -132,18 +140,23 @@ class CSVtypes:
 
         if interface_name == None:
             for index, row in device_rows.iterrows():
-                alias = row['<Alias>'] + '.cms.cern.ch' if '<Alias>' in row else None
+                alias = row['<Alias>'] if '<Alias>' in row else None
                 if alias is not None:
-                    IPAList.append(alias)
+                    split = alias.split('.')
+                    newalias = split[0] + self.domain
+                    IPAList.append(newalias)
         else:
             aliases_rows = device_rows[device_rows['<IFName>'] == interface_name]
             for index, row in aliases_rows.iterrows():
-                alias = row['<Alias>'] + '.cms.cern.ch' if '<Alias>' in row else None
+                alias = row['<Alias>'] if '<Alias>' in row else None
                 if alias is not None:
-                    IPAList.append(alias)
+                    split = alias.split('.')
+                    newalias = split[0] + self.domain
+                    IPAList.append(newalias)
             
         return IPAList
 
+    #NIC, Network Interface Card type
     def InterfaceCard(self, device_name):
         IFcard = []
 
@@ -158,20 +171,22 @@ class CSVtypes:
             IFcard.append(IFCards)
         return IFcard
     
-    def interface_list(self, device_name):
-        interfaceslist = []
-        device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
+    #to generate a list of interfaces for a specific device
+    # def interface_list(self, device_name):
+    #     interfaceslist = []
+    #     device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
 
-        for index, row in device_rows.iterrows():
-            interface_name = row['<IFName>'] if '<IFName>' in row else None
-            if pd.isna(interface_name):
-                interface_name = f"{device_name}.cms"
-                interfaceslist.append(interface_name)
-            else:
-                interfaceslist.append(interface_name)
-        return interfaceslist
+    #     for index, row in device_rows.iterrows():
+    #         interface_name = row['<IFName>'] if '<IFName>' in row else None
+    #         if pd.isna(interface_name):
+    #             interface_name = f"{device_name}.cms"
+    #             interfaceslist.append(interface_name)
+    #         else:
+    #             interfaceslist.append(interface_name)
+    #     return interfaceslist
 
-
+    #Device input type for inputting device information into lanDB
+    #If device name is not defined thne it gives a list of all device information from all devices in 'devices.csv'
     def DeviceInput(self, device_name=None):
         required_columns = {'<Device>', '<Manufacturer>', '<model>'}
 
@@ -231,40 +246,52 @@ class CSVtypes:
     
         return devinp
 
-    
-    def Interfaces(self, device_name):
-        IF = []
-        # interface_list = self.interface_list(device_name)
-        # IF.append(f"Interfaces: {interface_list}")
+    #    
+    # def Interfaces(self, device_name):
+    #     IF = []
+    #     # interface_list = self.interface_list(device_name)
+    #     # IF.append(f"Interfaces: {interface_list}")
                 
-        device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
+    #     device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
                 
-        for index, row in device_rows.iterrows():
-                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms.cern.ch'
-                Interface = {
-                            'InterfaceName': interface_name,
-                            'IPAlais': self.IPAliasList(device_name= device_name, interface_name= interface_name) if self.IPAliasList(device_name= device_name, interface_name= interface_name) != '[]' else None,
-                            'Location': self.location(device_name), 
-                            'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
-                            'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
-                            'InternetConnectivity': row['<InternetConnectivity>'] if '<InternetConnectivity>' in row else None,
-                            'Medium': self.get_medium_description(row['<Medium>']) if '<Medium>' in row else "GIGABITETHERNET",
-                            'SwitchName': row['<Switch>'],
-                            'PortNumber': row['<Port>'],
-                            'CableNumber': row['<Cable>'],
-                            'IP': row['<IP>'] if '<IP>' in row else None,
-                            'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
-                            'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
-                        }
-                IF.append(Interface)
-        return IF
+    #     for index, row in device_rows.iterrows():
+    #             interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + self.domain
+    #             Interface = {
+    #                         'InterfaceName': interface_name,
+    #                         'IPAlais': self.IPAliasList(device_name= device_name, interface_name= interface_name) if self.IPAliasList(device_name= device_name, interface_name= interface_name) != '[]' else None,
+    #                         'Location': self.location(device_name), 
+    #                         'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
+    #                         'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
+    #                         'InternetConnectivity': row['<InternetConnectivity>'] if '<InternetConnectivity>' in row else None,
+    #                         'Medium': self.get_medium_description(row['<Medium>']) if '<Medium>' in row else "GIGABITETHERNET",
+    #                         'SwitchName': row['<Switch>'],
+    #                         'PortNumber': row['<Port>'],
+    #                         'CableNumber': row['<Cable>'],
+    #                         'IP': row['<IP>'] if '<IP>' in row else None,
+    #                         'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
+    #                         'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
+    #                     }
+    #             IF.append(Interface)
+    #     return IF
+
+    def interfacenames(self, IFname, device_name):
+        if IFname == device_name:
+            updatedname = device_name + self.domain
+        else:
+            splitIF = IFname.split('.')
+            if len(splitIF) == 3:
+                updatedname = f"{splitIF[0]}-{splitIF[1]}--{splitIF[2]}.cern.ch"
+            else:
+                updatedname = device_name + self.domain
+        return updatedname
     
     def BulkInterface(self, device_name): 
         interfaces = []               
         device_rows = self.interfacescsvfile[self.interfacescsvfile['<Device>'] == device_name]
                 
         for index, row in device_rows.iterrows():
-                interface_name = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name + '.cms.cern.ch'
+                intname = row['<IFName>'] if '<IFName>' in row and not pd.isna(row['<IFName>']) else device_name
+                interface_name = self.interfacenames(intname, device_name)
                 BInterface = {
                             'InterfaceName': interface_name,
                             'IPAliases': self.IPAliasList(device_name= device_name) if self.IPAliasList(device_name= device_name) != '[]' else None,
@@ -272,7 +299,7 @@ class CSVtypes:
                             'OutletLabel': row['<OutletLabel>'] if '<OutletLabel>' in row else "AUTO",
                             'SecurityClass': row['<SecurityClass>'] if '<SecurityClass>' in row else "USER",
                             'InternetConnectivity': row['<InternetConnectivity>'] if '<InternetConnectivity>' in row else False,
-                            'Medium': self.get_medium_description(row['<Medium>']) if '<Medium>' in row else "GIGABITETHERNET",
+                            'Medium': self.get_medium_description(row['<Speed>']) if '<Speed>' in row else "GIGABITETHERNET",
                             'SwitchName': row['<Switch>'],
                             'PortNumber': row['<Port>'],
                             'CableNumber': row['<Cable>'],
@@ -283,6 +310,7 @@ class CSVtypes:
                 interfaces.append(BInterface)
         return interfaces
 
+    #Returns all device info, deviceinput, bulkinterfaces, NICs
     def search_device_info(self, device_name = None):
 
         alldevice_info = []
@@ -314,6 +342,7 @@ class CSVtypes:
 
         return alldevice_info
     
+    #Retreives MAC addresses from device names through their serial number
     def MACaddress(self, device_name):
         deviceserial = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
         serialnumber = deviceserial['<Serial>'].values[0]
