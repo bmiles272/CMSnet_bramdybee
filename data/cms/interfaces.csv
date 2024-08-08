@@ -5,19 +5,19 @@ spare-c2d11-35-01,,,,D3562-1V-IP55-SHPYL-1414,25,25,1
 
 # Main interface & IPMI in different location but primary service
 spare-c2d11-36-01,,,,D3562-1V-IP55-SHPYL-1414,26,26,1
-spare-c2d11-36-01,spare-c2d11-36-01.ipmi.cms,,,D3562-1V-IP56-SHPYL-3021,26,26,1
+spare-c2d11-36-01,spare-c2d11-36-01.ipmi,,,D3562-1V-IP56-SHPYL-3021,26,26,1
 
 # Main interface & IPMI in different location but secondary service
 # Try the following also with IPMI on  port 37....
 spare-c2d15-37-01,,,,D3562-1V-IP59-SHPYL-1814,37,37,1
-spare-c2d15-37-01,spare-c2d15-37-01.ipmi.cms,,S3562-1-SI59,D3562-1V-IP59-SHPYL-1814,38,38,1
+spare-c2d15-37-01,spare-c2d15-37-01.ipmi,,S3562-1-SI59,D3562-1V-IP59-SHPYL-1814,38,38,1
 
 # Device with no IPMI interface
 mch-c2d12-13-01,,,,D3562-1V-IP56-SHPYL-3021,2,2,1
 
 # Device with main&IPMI, and also an ATCA interface
 spare-c2d11-38-01,,,,D3562-1V-IP55-SHPYL-1414,28,28,1
-spare-c2d11-38-01,spare-c2d11-38-01.atca01.cms,em2,,D3562-1V-IP56-SHPYL-3021,3,3,1
+spare-c2d11-38-01,spare-c2d11-38-01.atca01,em2,,D3562-1V-IP56-SHPYL-3021,3,3,1
 
 # Device with main&IPMI and GPN service
 spare-c2d11-39-01,,,,D3562-1V-IP55-SHPYL-1414,29,29,1
@@ -25,7 +25,7 @@ spare-c2d11-39-01,spare-c2d11-39-01,,,U3562-1V-IPV-SHPYL-4321,39,39,1
 
 # Device with main&IPMI and two data networks
 spare-c2d11-40-01,,,,D3562-1V-IP55-SHPYL-1414,30,30,1
-spare-c2d11-40-01,spare-c2d11-40-01.d3vfbs1v0.cms,ens3f0,S3562-1X-IP30,D3VSW-ETH-C2E33-28-01--CMS,1/0/0,1000,100
-spare-c2d11-40-01,spare-c2d11-40-01.d3vrbs1v0.cms,ens4f0,S3562-1X-IP31,D3VSW-ETH-C2E33-28-01--CMS,3/0/0,3000,100
+spare-c2d11-40-01,spare-c2d11-40-01.d3vfbs1v0,ens3f0,S3562-1X-IP30,D3VSW-ETH-C2E33-28-01--CMS,1/0/0,1000,100
+spare-c2d11-40-01,spare-c2d11-40-01.d3vrbs1v0,ens4f0,S3562-1X-IP31,D3VSW-ETH-C2E33-28-01--CMS,3/0/0,3000,100
 
 

@@ -19,25 +19,41 @@ class bramDB():
         name = '.env'
         with open(name, 'w') as file:
             file.write('AUTH_TOKEN=' + token)
-        return print('file .env created and token inputted, be careful not to push .env file into directory')
+        return print('file .env created and token inputted')
 
-    def file_older_than_9half(self, file): 
+    def file_older_than_9half(self, file) -> bool: 
         '''
         Check whether .env file generated to store the authentication token is older than 9.5 hours.
         '''
         file_time = path.getmtime(file) 
-        if ((time.time() - file_time) / 3600 > 9.5):
-            return PermissionError('Authentication key is invalid, enter password and username')
-        return ((time.time() - file_time) / 3600 < 9.5)
+        # if ((time.time() - file_time) / 3600 > 9.5):
+        #     return PermissionError('Authentication key is invalid, enter password and username')
+        return (time.time() - file_time) / 3600 > 9.5
     
-    def authenticate(self, file = '.env', username: str | None = None, password: str | None = None):
+    def authenticate(self, file = '.env', username: str | None = None, password: str | None = None) -> None:
         '''
         checking authentication token
         '''
-        if os.path.exists(file) and self.file_older_than_9half(file):
-            load_dotenv(find_dotenv(filename= file))
-            token = os.getenv('AUTH_TOKEN')
-            self.landb.filltoken(token)
+        if os.path.exists(file):
+            if self.file_older_than_9half(file):
+                print('Authentication key is invalid, enter credentials')
+                username = input("Enter your username: ")
+                password = getpass.getpass("Enter your password: ")
+                token = self.landb.getAuthToken(username, password, 'CERN')
+                self.write_env(token)
+                self.landb.filltoken(token)
+            else:
+                load_dotenv(find_dotenv(filename= file))
+                token = os.getenv('AUTH_TOKEN')
+                try:
+                    self.landb.filltoken(token)
+                except:
+                    print('No valid token found in the .env file.')
+                    username = input("Enter your username: ")
+                    password = getpass.getpass("Enter your password: ")
+                    token = self.landb.getAuthToken(username, password, 'CERN')
+                    self.write_env(token)
+                    self.landb.filltoken(token)
         else:
             print('no valid token present')
             username = input("Enter your username: ")
@@ -45,14 +61,4 @@ class bramDB():
             token = self.landb.getAuthToken(username, password, 'CERN')
             self.write_env(token)
             self.landb.filltoken(token)
-            
-
-
-
-        
-        
-    
-    
-
-
 

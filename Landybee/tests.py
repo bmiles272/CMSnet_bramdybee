@@ -1,20 +1,31 @@
 from CMSNet_ng_add import cmsnet_add
 from CSVExtracttoDict import CSVtypes
-from bramdybee import bramDB
+import bramdybee
 from CMSNet_ng_delete import cmsnet_delete
+import os
+from ConvSUDStoDict import SUDS2Dict
+import json
 extract_dict = CSVtypes()
-bramdb = bramDB()
+bramdb = bramdybee.bramDB()
+s2d = SUDS2Dict()
 
-device = 'spare-c2d11-40-01'
+device = 'spare-c2d15-37-01'
 # switch = 'D3562-1V-IP55-SHPYL-1414'
 # print(extract_dict.DeviceInput(device))
 # print(extract_dict.InterfaceCard(device))
 # print(extract_dict.BulkInterface(device))
 # print(bramdb.landb.getSwitchInfo(switch))
 
-# add = cmsnet_add(device)
-# add()
 
-delete = cmsnet_delete(device)
-delete()
-# print(bramdb.landb.getSwitchInfo('D3562-1V-IP56-SHPYL-1514'))
+
+# delete = cmsnet_delete(device)
+# delete()
+add = cmsnet_add(device)
+add()
+
+
+
+
+
+
+
