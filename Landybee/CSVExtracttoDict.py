@@ -83,7 +83,6 @@ class CSVtypes:
 
     #location dictionary, pointing to location of device in building, floor, room format
     def location(self, device_name):
-        locations = []
         csvfile = self.devicescsvfile
 
         required_columns = {'<Device>', '<building>', '<floor>', '<room>'}
@@ -98,12 +97,10 @@ class CSVtypes:
                         'Room': row['<room>']
                     }
 
-                locations.append(location)
-        return locations
+        return location
 
     #person input dictionary points to owner of device and their information
     def PersonInput(self, device_name):
-        PersonInput = []
 
         csvfile = self.devicescsvfile
 
@@ -118,11 +115,9 @@ class CSVtypes:
                         'PersonID': row['<PersonID>'] if '<PersonID>' in row else None
                     }
                         
-                PersonInput.append(PersonInputs)
-        return PersonInput
+        return PersonInputs
 
     def OperatingSystem(self, device_name):
-        OS = []
         csvfile = self.devicescsvfile
 
         required_columns = {'<OS>', '<OSversion>'}
@@ -136,8 +131,7 @@ class CSVtypes:
                         'Version': row['<OSversion>']
                     }
         
-                OS.append(OpSys)
-        return OS
+        return OpSys
     
     #IP alias list, as a device can have more than 1 interface each interface can have its own alias
     def IPAliasList(self, device_name = None, interface_name = None):
@@ -205,7 +199,7 @@ class CSVtypes:
     #If device name is not defined thne it gives a list of all device information from all devices in 'devices.csv'
     def DeviceInput(self, device_name=None):
         required_columns = {'<Device>', '<Manufacturer>', '<model>'}
-
+        devinp = None
         for file_path in self.file_list:
             try:
                 csvfile = pd.read_csv(file_path, comment='#')
@@ -237,6 +231,8 @@ class CSVtypes:
                             }
                 else:
                     device_rows = csvfile[csvfile['<Device>'] == device_name]
+                    if device_rows.empty:
+                        raise Exception("Device not found in devices.csv and so cannot be uploaded")
                     for index, row in device_rows.iterrows():
                         devinp = {
                             'DeviceName': device_name,
@@ -259,11 +255,7 @@ class CSVtypes:
 
             except Exception as e:
                 print(f"An error occurred while processing file {file_path}: {e}")
-        print(devinp)
-        if devinp is None:
-            devinp = '[hey]'
-
-        return
+        return devinp
         
 
 

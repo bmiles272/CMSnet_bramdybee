@@ -13,6 +13,7 @@ import json
 from CSVExtracttoDict import CSVtypes
 import bramdybee
 import ConvSUDStoDict
+import os
 #initiate any clases required
 extract_dict = CSVtypes()
 bramdb = bramdybee.bramDB()
@@ -32,7 +33,8 @@ class cmsnet_add:
 
     def deviceInsert(self):
         if self.device_input is None:
-            print(f"No device information in devices.csv for device {self.device_name}")
+            print(f"No device information in devices.csv for device {self.device_name}, stopping add process.")
+            exit()
 
         else:
             try:
@@ -40,6 +42,7 @@ class cmsnet_add:
                 print(f"Successfully inserted device info for device {self.device_name}.")
             except Exception as e:
                 print(f"There was an ERROR inserting the device info for device {self.device_name}: {e}")
+                exit()
     
     def deviceAddCard(self):
         if not self.interface_card:
@@ -123,16 +126,16 @@ class cmsnet_add:
         interfaces = extract_dict.interface_list(self.device_name)
         ipmi_interface_found = any('ipmi' in iface.lower() for iface in interfaces)
 
-        if ipmi_interface_found:
+        if not ipmi_interface_found:
             if hardware_address is not None:
                 if hardware_address.get("IPMIMAC") is not None:
                     ipmi_name =  self.device_name + '.ipmi'
-                    device_interface['Interfacename'] = extract_dict.interfacenames(self.device_name, ipmi_name)
+                    device_interface['InterfaceName'] = extract_dict.interfacenames(ipmi_name, self.device_name)
                     IPMI_IF = device_interface
 
                     try:
                         bramdb.landb.deviceAddBulkInterface(self.device_name, IPMI_IF)
-                        print(f"Successfully added Interface {IPMI_IF} for device {self.device_name}.")
+                        print(f"Successfully added Interface {IPMI_IF.get('InterfaceName')} for device {self.device_name}.")
                     except Exception as e:
                         print(f"There was an ERROR adding IPMI Interface {IPMI_IF} for device {self.device_name}: {e}")
             else:
