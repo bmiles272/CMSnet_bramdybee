@@ -24,7 +24,7 @@ class cmsnet_delete:
             bramdb.landb.getDeviceInfo(device_name)
         except Exception as e:
             print(f"Device {device_name} not found in lanDB database: {e}")
-            sys.exit()
+            exit()
 
     #function to just delete intefaces, will prompt user with list of possible interfaces to delete from a device.
     def delete_interface(self):

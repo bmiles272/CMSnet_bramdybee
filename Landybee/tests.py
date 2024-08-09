@@ -12,15 +12,16 @@ bramdb = bramdybee.bramDB()
 
 s2d = SUDS2Dict()
 
-device = 'spare-c2d11-40-01'
+device = 'spare-c2d11-35-01'
 # switch = 'D3562-1V-IP55-SHPYL-1414'
 # print(extract_dict.DeviceInput(device))
 # print(extract_dict.InterfaceCard(device))
 # print(extract_dict.BulkInterface(device))
 # print(bramdb.landb.getSwitchInfo(switch))
-
+# devdict = extract_dict.DeviceInput(device)
+# print(type(devdict))
 checker = cmsnet_check(device)
-checker()
+hey = checker.compare_all()
 
 # delete = cmsnet_delete(device)
 # delete()
