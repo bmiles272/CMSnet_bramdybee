@@ -13,7 +13,8 @@ import json
 from CSVExtracttoDict import CSVtypes
 import bramdybee
 import ConvSUDStoDict
-import os
+import argparse
+
 #initiate any clases required
 extract_dict = CSVtypes()
 bramdb = bramdybee.bramDB()
@@ -146,3 +147,28 @@ class cmsnet_add:
         self.deviceInsert()
         self.deviceAddCard()
         self.deviceAddBulkInterface()
+
+
+def commandline():
+    parser = argparse.ArgumentParser(description= "Add devices from the CMS csv databases to the lanDB CERN database.")
+    parser.add_argument('-h', '--help', action = 'help', default= argparse.SUPPRESS, help= 'Show help message and exit.')
+    parser.add_argument('device_name', type=str, help='The name of the device to manage.')
+    parser.add_argument('--insert', action='store_true', help='Insert device information.')
+    parser.add_argument('--add-card', action='store_true', help='Add interface cards to the device.')
+    parser.add_argument('--add-bulk-interface', action='store_true', help='Add bulk interfaces to the device.')
+    parser.add_argument('-a', '--add', action='store_true', help='Call all functions: adds a device to the lanDB database with information from the CMS .csv files.')
+
+    args = parser.parse_args()
+    cmsnet = cmsnet_add(args.device_name)
+
+    if args.add:
+        cmsnet()  # Calls the __call__ method to execute all three functions
+    else:
+        if args.insert:
+            cmsnet.deviceInsert()
+        
+        if args.add_card:
+            cmsnet.deviceAddCard()
+        
+        if args.add_bulk_interface:
+            cmsnet.deviceAddBulkInterface()
