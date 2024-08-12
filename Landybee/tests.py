@@ -21,7 +21,7 @@ device = 'spare-c2d11-35-01'
 # devdict = extract_dict.DeviceInput(device)
 # print(type(devdict))
 checker = cmsnet_check(device)
-hey = checker.compare_all()
+checker()
 
 # delete = cmsnet_delete(device)
 # delete()

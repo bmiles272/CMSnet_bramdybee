@@ -166,7 +166,8 @@ class CSVtypes:
             try:
                 mac_info = self.MACaddress(device_name)
                 if mac_info is not None:
-                    hw_address = mac_info.get('OnboardMAC1') or mac_info.get('OnboardMAC2')
+                    hw_address1 = mac_info.get('OnboardMAC1') or mac_info.get('OnboardMAC2')
+                    hw_address = hw_address1.replace(":", "-")
                 else:
                     hw_address = None
             except Exception as e:

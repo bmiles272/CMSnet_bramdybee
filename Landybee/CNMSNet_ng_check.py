@@ -47,141 +47,73 @@ class cmsnet_check:
             'NetworkInterfaceCards': self.interface_card,
             'Interfaces': self.bulk_interface
         }
-        # print(type(self.combined_dicts))
-        # print(type(self.device_params))
-        # print(self.device_params)
-        # print(self.combined_dicts.get("Location"))
-        # print(self.device_input)
-        # print(self.combined_dict)
 
-    def get_all_keys(self, iterable, returned = "value"):
 
-        result = {}
-
-        def extract(current_iterable: dict, parent_key = ''):
-            if isinstance(current_iterable, dict):
-                for key, value in current_iterable.items():
-                    full_key = f"{parent_key}/{key}" if parent_key else key
-
-                    if returned == "key":
-                        result[full_key] = None  # assign automatiuc value, for cmsnet use most liekly wont be used.
-                    elif returned == "value":
-                        if full_key not in result:
-                            result[full_key] = []
-
-                        elif (isinstance(value, dict) or isinstance(value, list)):
-                            new_values = extract(value, parent_key = full_key)
-                            if new_values:
-                                result[full_key] = new_values
-
-                        else:
-                            result[full_key].append(value)
-                        
-                    else:
-                        raise ValueError("'returned' keyword only accepts 'key' or 'value'.")
-                    
-
-                    extract(value, parent_key=full_key)
-
-            if isinstance(current_iterable, list):
-                for index, el in enumerate(current_iterable):
-                    extract(el, parent_key= f'{parent_key}[{index}]')
-
-            else:
-                if returned == "value":
-                    if parent_key not in result:
-                        result[parent_key] = []
-                    result[parent_key].append(current_iterable)
-            
-        extract(iterable)
-        return result
+    def iterate_nested_dicts(self, json_obj, root_key=None):
+        results = {}
         
-    def describe_changes(self, changes):
-        for path, change in changes.items():
-            old_value = change['old_value']
-            new_value = change['new_value']
-            
-            message = f"For: {path}, the value given in cmsnet csv is {old_value}, the lanDB database has it recorded as {new_value}."
-            print(message)
+        if isinstance(json_obj, dict):
+            for key, value in json_obj.items():
+                if root_key is not None:
+                    current_key = f"{root_key}.{key}" if root_key else key
+                else:
+                    current_key = key
+
+                if isinstance(value, dict) or isinstance(value, list):
+                    results.update(self.iterate_nested_dicts(value, current_key))
+                else:
+                    if isinstance(value, str):
+                        value = value.lower()
+                    results[current_key] = value
+        elif isinstance(json_obj, list):
+            for index, item in enumerate(json_obj):
+                list_key = f"{root_key}[{index}]"
+                if isinstance(item, dict) or isinstance(item, list):
+                    results.update(self.iterate_nested_dicts(item, list_key))
+                else:
+                    if isinstance(item, str):
+                        item = item.lower()
+                    results[list_key] = item
+
+        return results
     
 
-    def compare_all(self):
-        cmsnet = self.get_all_keys(self.combined_csmnet)
-        landb = self.get_all_keys(self.device_landb)
-        # print(self.device_landb)
-        print(landb)
+    def compare_dicts(self):
+        #using iterated_nested_dicts we flatten both dictionaries to compare all the value
+        flat_cmsnet = self.iterate_nested_dicts(self.combined_csmnet)
+        flat_landb = self.iterate_nested_dicts(self.device_landb)
 
-    # def compare_location(self):
-    #     location = self.device_input.get('Location')
-    #     locationdict = {key: str(value).lower() for key, value in location.items()}
-    #     landb_lower = {key: str(value).lower() for key, value in self.device_landb.get("UserPerson").items()}
-    #     diff_location = DeepDiff(locationdict, landb_lower, ignore_order = True)
-    #     changes = diff_location.get('values_changed')
+        matching_keys = set(flat_cmsnet.keys()).intersection(set(flat_landb.keys()))
 
-    #     if not changes:
-    #         print(f"No differences in location for device {self.device_name}.")
-    #     else:
-    #         print(self.describe_changes(changes))
+        differences = {}
 
-    # def compare_personinput(self):
-    #     personinput = self.device_input.get('UserPerson')
-    #     personinput_dict = {key: str(value).lower() for key, value in personinput.items()}
-    #     landb_lower = {key: str(value).lower() for key, value in self.device_landb.get("UserPerson").items()}
-    #     diff_location = DeepDiff(personinput_dict, landb_lower, ignore_order = True)
-    #     changes = diff_location.get('values_changed')
+        for key in matching_keys:
+            value_cmsnet = flat_cmsnet.get(key)
+            value_landb = flat_landb.get(key)
 
-    #     if not changes:
-    #         print(f"No differences in User Person, Responsible Person and lanDB Manager Person for device {self.device_name}.")
-    #     else:
-    #         print(self.describe_changes(changes))
+            #Convert strings found in cms .csv files into strings so they can be easily compared
+            if isinstance(value_cmsnet, int):
+                value_cmsnet = str(value_cmsnet)
+            
+            #LanDB returns some room values as 0001 instead of 1, to compare we remove any zeros before integer and ocnvert ints to strings
+            if isinstance(value_landb, str) and value_landb.isdigit():
+                value_landb = str(int(value_landb))
 
-    # def compare_operatingsystem(self):
-    #     os = self.device_input.get('OperatingSystem')
-    #     os_dict = {key: str(value).lower() for key, value in os.items()}
-    #     landb_lower = {key: str(value).lower() for key, value in self.device_landb.get("OperatingSystem").items()}
-    #     diff_location = DeepDiff(os_dict, landb_lower, ignore_order = True)
-    #     changes = diff_location.get('values_changed')
+            #Convert any bools to strings as cms .csv returns them as strings while lanDB returns them as bools
+            if isinstance(value_cmsnet, bool):
+                value_cmsnet = str(value_cmsnet)
 
-    #     if not changes:
-    #         print(f"No differences in Operating System for device {self.device_name}.")
-    #     else:
-    #         print(self.describe_changes(changes))
+            if isinstance(value_landb, bool):
+                value_landb = str(value_landb)
 
+            if value_cmsnet != value_landb:
+                differences[key] = {
+                    "CMS database": value_cmsnet,
+                    "lanDB database": value_landb
+                }
 
-    # def compare_deviceinput(self):
-    #     diff_devinp = DeepDiff(self.device_input, self.device_landb, ignore_order= True, ignore_string_case= True)
-    #     changes = diff_devinp.get('values_changed')
-    #     # print(diff_devinp)
-    #     if not changes:
-    #         print(f"No differences in device parameters for device {self.device_name}.")
-    #     else:
-    #         print(self.describe_changes(changes))
-    #     # differences = {
-    #     #     key.lower(): {'old_value': str(self.device_landb[key]).lower(),
-    #     #           'new_value': str(self.device_input[key]).lower()}
-    #     #     for key in self.device_landb
-    #     #     if key in self.device_input and str(self.device_landb[key]).lower() != str(self.device_input[key]).lower()
-    #     # }
-    #     # print(differences)
+        print(f"Differences found between lanDB database and CMS database for device {self.device_name}:")
+        return print(differences)
 
-    # def compare_interfacecards(self):
-    #     diff_devcards = DeepDiff(self.interface_card, self.device_landb, ignore_order= True, ignore_string_case= True)
-    #     changes = diff_devcards.get('values_changed')
-    #     if not changes:
-    #         print(f"No differences in interface cards for device {self.device_name}.")
-    #     else:
-    #         print(self.describe_changes(changes))
-
-    # def compare_bulkinterface(self):
-    #     diff_bulkinterface = DeepDiff(self.interface_card, self.device_landb, ignore_order= True, ignore_string_case= True)
-    #     changes = diff_bulkinterface.get('values_changed')
-    #     # print(diff_bulkinterface)
-    #     if not changes:
-    #         print(f"No differences in bulk interface for device {self.device_name}.")
-    #     else:
-    #         print(self.describe_changes(changes))
-
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        self.compare_location()
-        self.compare_personinput()
-        self.compare_operatingsystem()
+    def __call__(self) -> Any:
+        self.compare_dicts()
