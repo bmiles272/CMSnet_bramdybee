@@ -112,7 +112,7 @@ class cmsnet_add:
                     if macaddress:
                         bind = bramdb.landb.bindUnbindInterface(IFName, macaddress)
                         if bind:
-                            print(f"Interface successfully bound to hardware address {macaddress}.")
+                            print(f"Interface {IFName} successfully bound to hardware address {macaddress}.")
                         else:
                             print(f"Failed to bind interface {IFName} to hardware address {macaddress}.")
                     else:
@@ -138,8 +138,8 @@ class cmsnet_add:
                         print(f"Successfully added Interface {IPMI_IF.get('InterfaceName')} for device {self.device_name}.")
                     except Exception as e:
                         print(f"There was an ERROR adding IPMI Interface {IPMI_IF} for device {self.device_name}: {e}")
-            else:
-                print("IPMI Hardware address information is not available. Skipping creation of IPMI interface.")
+                else:
+                    print("IPMI Hardware address information is not available. Skipping creation of IPMI interface.")
         
     #Call function is what allows all 3 functions to be used when instance of add_device is called in combination with a device name.
     def __call__(self) -> Any:

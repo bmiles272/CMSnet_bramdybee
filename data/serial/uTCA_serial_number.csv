@@ -1,3 +1,4 @@
+<Serial>,<OnboardMAC1>,<OnboardMAC2>,<IPMIMAC>
 # Lists of eth addresses for uTCA and related HW (PSU, etc...)
 
 # uTCA TCDS crates in S1E01
