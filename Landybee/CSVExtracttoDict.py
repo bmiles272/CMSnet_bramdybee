@@ -18,20 +18,28 @@ class CSVtypes:
         '''
         Call all .csv files whihc are used throughout the functions, a list is also generated as some functions require data from more than one file.
         '''
-        self.devicescsvfile = pd.read_csv('data/cms/devices.csv', comment='#')
-        self.aliasescsvfile = pd.read_csv('data/cms/aliases.csv', comment='#')
-        self.interfacescsvfile = pd.read_csv('data/cms/interfaces.csv', comment='#')
-        self.networkscsvfile = pd.read_csv('data/cms/networks.csv', comment='#')
-        self.networks_routescsvfile = pd.read_csv('data/cms/networks_routes.csv', comment='#')
-        self.switches_special_portscsvfile = pd.read_csv('data/cms/switches_special_ports.csv', comment='#')
+        file_devicescsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'devices.csv'))
+        file_aliasescsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'aliases.csv'))
+        file_interfacescsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'interfaces.csv'))
+        file_networkscsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'networks.csv'))
+        file_networks_routescsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'networks_routes.csv'))
+        file_switches_special_portscsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'switches_special_ports.csv'))
+
+
+        self.devicescsvfile = pd.read_csv(file_devicescsv, comment='#')
+        self.aliasescsvfile = pd.read_csv(file_aliasescsv, comment='#')
+        self.interfacescsvfile = pd.read_csv(file_interfacescsv, comment='#')
+        self.networkscsvfile = pd.read_csv(file_networkscsv, comment='#')
+        self.networks_routescsvfile = pd.read_csv(file_networks_routescsv, comment='#')
+        self.switches_special_portscsvfile = pd.read_csv(file_switches_special_portscsv, comment='#')
 
         if file_list is None:
-            self.file_list = ['data/cms/devices.csv', 'data/cms/aliases.csv', 'data/cms/interfaces.csv', 'data/cms/networks.csv', 'data/cms/networks_routes.csv', 'data/cms/switches_special_ports.csv']  # Default file list
+            self.file_list = [file_devicescsv, file_aliasescsv, file_interfacescsv, file_networkscsv, file_networks_routescsv, file_switches_special_portscsv]  # Default file list
         else:
             self.file_list = file_list
 
         #import serial files and combine them since they have equal columns
-        serialpath = 'data/serial'
+        serialpath = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/serial'))
 
         serial = [f for f in listdir(serialpath) if isfile(os.path.join(serialpath, f))]
 
@@ -182,6 +190,75 @@ class CSVtypes:
             IFcard.append(IFCards)
         return IFcard
     
+    def IPMIinterfacecard(self, device_name):
+        # Initialize IFCard outside the try-except block
+        IFCard = {
+            'HardwareAddress': None,
+            'CardType': "Ethernet"
+        }
+        
+        try:
+            mac_info = self.MACaddress(device_name)
+            ipmimac = mac_info.get('IPMIMAC')
+            
+            if ipmimac is not None:
+                IFCard['HardwareAddress'] = ipmimac
+            else:
+                IFCard['HardwareAddress'] = None
+                
+        except Exception as e:
+            print(f"MAC address for device {device_name} could not be found in the CMS csv files. Exception: {e}")
+
+        return IFCard
+    
+    #generate a list of interface cards, device NIC and ipmi NIC
+    def CombinedInterfaceCards(self, device_name):
+        # Initialize the list to store the two dictionaries
+        interface_cards = []
+
+        # Process for InterfaceCard
+        ifcard_list = []
+        device_rows = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
+        mac_info = self.MACaddress(device_name)  #obtains mac addresses from device name using serial
+
+        for index, row in device_rows.iterrows():
+            try:
+                if mac_info is not None:
+                    hw_address1 = mac_info.get('OnboardMAC1') or mac_info.get('OnboardMAC2')
+                    hw_address = hw_address1.replace(":", "-") if hw_address1 else None
+            except Exception as e:
+                print(f"MAC address for device {device_name} could not be found in the CMS csv files. Exception: {e}")
+                hw_address = None
+
+            ifcard_list.append({
+                'HardwareAddress': hw_address,
+                'CardType': row['<CardType>'] if '<CardType>' in row else "Ethernet"
+            })
+
+        # Process for IPMIinterfacecard
+        try:
+            ipmimac = mac_info.get('IPMIMAC')
+            if ipmimac is not None:
+                ipmimac_format = ipmimac.replace(":", "-") if ipmimac else None
+
+                ipmi_card = {
+                    'HardwareAddress': ipmimac_format,
+                    'CardType': "Ethernet"
+                }
+            else:
+                ipmi_card = {
+                    'HardwareAddress': None,
+                    'CardType': "Ethernet"
+                }
+        except Exception as e:
+            print(f"MAC address for device {device_name} could not be found in the CMS csv files. Exception: {e}")
+
+        # Append both dictionaries to the list
+        interface_cards.extend(ifcard_list)
+        interface_cards.append(ipmi_card)
+
+        return interface_cards
+        
     # to generate a list of interfaces for a specific device
     def interface_list(self, device_name):
         interfaceslist = []
@@ -225,10 +302,10 @@ class CSVtypes:
                                 'InventoryNumber': row['<InventoryNumber>'] if '<InventoryNumber>' in row else None,
                                 'LandbManagerPerson': self.PersonInput(device) if self.PersonInput != None else None,
                                 'ResponsiblePerson': self.PersonInput(device),
-                                'UserPerson': self.PersonInput(device) if self.PersonInput != None else None,
-                                'HCPResponse': row['<HCPResponse>'] if '<HCPResponse>' in row else None,
-                                'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
-                                'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
+                                'UserPerson': self.PersonInput(device) if '<MainUser>' in row and not 'Main User' else None,
+                                'HCPResponse': True if '<ITDHCP>' in row else False, #if something present then true
+                                'IPv6Ready': True if '<IPv6Ready>' in row else False,
+                                'ManagerLocked': True if '<ManagerLocked>' in row else False, #same here for boolean
                             }
                 else:
                     device_rows = csvfile[csvfile['<Device>'] == device_name]
@@ -248,10 +325,10 @@ class CSVtypes:
                             'InventoryNumber': row['<InventoryNumber>'] if '<InventoryNumber>' in row else None,
                             'LandbManagerPerson': self.PersonInput(device_name) if self.PersonInput != None else None,
                             'ResponsiblePerson': self.PersonInput(device_name),
-                            'UserPerson': self.PersonInput(device_name) if self.PersonInput != None else None,
-                            'HCPResponse': row['<HCPResponse>'] if '<HCPResponse>' in row else None,
-                            'IPv6Ready': row['<IPv6Ready>'] if '<IPv6Ready>' in row else None,
-                            'ManagerLocked': row['<ManagerLocked>'] if '<ManagerLocked>' in row else None,
+                            'UserPerson': None,
+                            'HCPResponse': True if '<ITDHCP>' in row else False,
+                            'IPv6Ready': True if '<IPv6Ready>' in row else False,
+                            'ManagerLocked': True if '<ManagerLocked>' in row else False,
                         }
 
             except Exception as e:
@@ -292,49 +369,17 @@ class CSVtypes:
                             'CableNumber': row['<Cable>'],
                             'IP': row['<IP>'] if '<IP>' in row else None,
                             'IPv6': row['<IPv6>'] if '<IPv6>' in row else None,
-                            'ServiceName': row['<ServiceName>'] if '<Servicename>' in row else None
+                            'ServiceName': row['<ServiceName>'] if '<ServiceName>' in row and not pd.isna(row['<ServiceName>']) else None
                         }
                 interfaces.append(BInterface)
         return interfaces
-
-    #Returns all device info, deviceinput, bulkinterfaces, NICs
-    def search_device_info(self, device_name = None):
-
-        alldevice_info = []
-
-        if device_name == None:
-            device_names = self.devicescsvfile['<Device>'].unique()
-            
-            for device_name in device_names:
-
-                device_info = {
-                    'DeviceInput': self.DeviceInput(device_name),
-                    'BulkInterface': self.BulkInterface(device_name),
-                    'Interfaces': self.Interfaces(device_name),
-                    'NetworkInterfaceCards': self.InterfaceCard(device_name)
-
-                }
-                alldevice_info.append(device_info)
-        
-        else:
-            device_info = {
-                    'DeviceInput': self.DeviceInput(device_name),
-                    'BulkInterface': self.BulkInterface(device_name),
-                    'Interfaces': self.Interfaces(device_name),
-                    'InterfaceCards': self.InterfaceCard(device_name)
-
-                }
-        
-            alldevice_info.append(device_info)
-
-        return alldevice_info
     
     #Retreives MAC addresses from device names through their serial number
     def MACaddress(self, device_name):
         deviceserial = self.devicescsvfile[self.devicescsvfile['<Device>'] == device_name]
         serialnumber = deviceserial['<Serial>'].values[0]
         try: 
-            mac = self.serials[self.serials['<Serial>'] == serialnumber]
+            mac = self.serials[self.serials['<Serial>'] == serialnumber]  #all the serial files concatted into one
             if mac.empty:
                 return None
             macaddresses = {
@@ -345,19 +390,3 @@ class CSVtypes:
             return macaddresses
         except Exception as e:
             print(f"Serial number {serialnumber} for device {device_name} is not found or does not have a MAC address: {e}")
-            
-         
-
-''' for example '''
-# bramtype = CSVtypes()
-# device = 'spare-c2d11-39-01'
-# print(bramtype.Interfaces('spare-c2d11-40-01'))
-# print(bramtype.DeviceInput())
-# print('')
-# print(bramtype.BulkInterface(device))
-# print('')
-# print(bramtype.Interfaces(device))
-# print('')
-# print(bramtype.InterfaceCard(device))
-
-# print(bramtype.InterfaceCard(device))
