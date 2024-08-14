@@ -9,7 +9,8 @@ steps to be taken when creating:
 from typing import Any
 from CSVExtracttoDict import CSVtypes
 import bramdybee
-import sys
+import argparse
+#initialise any classes that need to be used
 extract_dict = CSVtypes()
 bramdb = bramdybee.bramDB()
 
@@ -67,3 +68,21 @@ class cmsnet_delete:
 
     def __call__(self) -> Any:
         self.delete_device()
+
+def commandline():
+    parser = argparse.ArgumentParser(description= "Delete devices from the CMS csv databases to the lanDB CERN database. Format: python3.11 CMSNet_ng_delete.py device_name --function.")
+    parser.add_argument('device_name', type=str, help='The name of the device to manage.')
+    parser.add_argument('--delete-interface', action='store_true', help='Delete an interface from a device')
+    parser.add_argument('--delete', action='store_true', help='Remove a device from lanDB database.')
+
+    args = parser.parse_args()
+    cmsnet = cmsnet_delete(args.device_name)
+
+    if args.delete:
+        cmsnet()  # Calls the __call__ method to execute all three functions
+    else:
+        if args.delete_interface:
+            cmsnet.delete_interface()
+
+if __name__ == "__main__":
+    commandline()
