@@ -4,6 +4,7 @@ import bramdybee
 from ConvSUDStoDict import SUDS2Dict
 import json
 import argparse
+import copy
 extract_dict = CSVtypes()
 bramdb = bramdybee.bramDB()
 conv = SUDS2Dict()
@@ -39,17 +40,19 @@ class cmsnet_check:
         self.device_input = extract_dict.DeviceInput(device_name)
         self.bulk_interface = extract_dict.BulkInterface(device_name)
         self.interface_cards = extract_dict.CombinedInterfaceCards(device_name)
-                
-        try:
-            ifnames = []
-            interfaces_landb = self.device_landb.get("Interfaces", [])
+        # print(self.bulk_interface)
 
+        #load in bulk interface information for each interface in a device.        
+        try:
+            self.ifnames = []
+            interfaces_landb = self.device_landb.get("Interfaces")
+            #retreive number and names of interfaces from 
             for interface in interfaces_landb:
-                IFName = interface.get("InterfaceName")
-                ifnames.append(IFName)
+                IFName = interface.get("Name")
+                self.ifnames.append(IFName)
 
             intf_list =[]
-            for name in ifnames:
+            for name in self.ifnames:
                 interface =  bramdb.landb.getBulkInterfaceInfo(name)
                 interface_str = conv.sobject_to_json(interface)
                 interface_landb = json.loads(interface_str)
@@ -57,9 +60,7 @@ class cmsnet_check:
         except Exception as e:
             print(f"ERROR: {e}")
 
-        self.interface_landb = intf_list
-
-        
+        self.interfaces_landb = intf_list
         self.device_name = device_name
 
         #combine the dicts
@@ -104,11 +105,17 @@ class cmsnet_check:
         #using iterated_nested_dicts we flatten both dictionaries to compare all the value
         #it also adjust values within dicts to be easily comparable
         differences = {}
-        SN = 'ServiceName'
 
-        if SN in matching_keys:
-            if flatcms_data.get(SN) is None:
-                matching_keys.remove(SN)
+        #if value in cms is none then ignore as lanDB automatcally assigns values
+        keys_none_cms = ['ServiceName', 'IP', 'IPv6']
+        for key in keys_none_cms:
+            if key in matching_keys and flatcms_data.get(key) is None:
+                matching_keys.remove(key)
+
+        if "OutletLabel" in matching_keys:
+            if flatcms_data["OutletLabel"] == 'auto' and flatlandb_data['OutletLabel'].startswith('auto'):
+                matching_keys.remove("OutletLabel")
+            
 
         for key in matching_keys:
             value_cmsnet = flatcms_data.get(key)
@@ -117,6 +124,8 @@ class cmsnet_check:
             #Convert strings found in cms .csv files into strings so they can be easily compared
             if isinstance(value_cmsnet, int):
                 value_cmsnet = str(value_cmsnet)
+            if isinstance(value_landb, int):
+                value_landb = str(value_landb)
             
             #LanDB returns some room values as 0001 instead of 1, to compare we remove any zeros before integer and ocnvert ints to strings
             if isinstance(value_landb, str) and value_landb.isdigit():
@@ -125,17 +134,15 @@ class cmsnet_check:
             #Convert any bools to strings as cms .csv returns them as strings while lanDB returns them as bools
             if isinstance(value_cmsnet, bool):
                 value_cmsnet = str(value_cmsnet)
-
             if isinstance(value_landb, bool):
                 value_landb = str(value_landb)
 
+            #reproduce differences as a dictionary with clear entries
             if value_cmsnet != value_landb:
                 differences[key] = {
                     "CMS database": value_cmsnet,
                     "lanDB database": value_landb
                 }
-
-            
 
         return differences
     
@@ -144,12 +151,12 @@ class cmsnet_check:
         flat_cms_devicesinput = self.iterate_nested_dicts(self.device_input)
         flat_landb_deviceinput = self.iterate_nested_dicts(self.device_landb)
         matchingkeys = set(flat_cms_devicesinput.keys()).intersection(set(flat_landb_deviceinput))
-        print(matchingkeys)
-        print(flat_landb_deviceinput)
+        # print(matchingkeys)
+        # print(flat_landb_deviceinput)
 
         try:
             compare_devinp = self.compare_dicts(flatcms_data= flat_cms_devicesinput, flatlandb_data= flat_landb_deviceinput, matching_keys= matchingkeys)
-            print(f"Differences found between lanDB database and CMS database for device {self.device_name}:")
+            print(f"DEVICE INPUT: Differences found between lanDB database and CMS database for device {self.device_name}:")
             if compare_devinp == self.empty:
                 print(f"NO DIFFERENCES")
             else:
@@ -181,7 +188,7 @@ class cmsnet_check:
                         matching_keys= matchingkeys
                         )
                     
-                    print(f"Differences found between lanDB database and CMS database for device {self.device_name}:")
+                    print(f"NICs: Differences found between lanDB database and CMS database for device {self.device_name}:")
                     if compare_card == self.empty:
                         print(f"NO DIFFERENCES")
                     else:
@@ -202,23 +209,43 @@ class cmsnet_check:
         return None
 
     def compare_interfaces(self):
-        #first select interface with matching names in cms and landb database
-        interfaces_landb = self.device_landb.get("Interfaces", [])
-        # print(interfaces_landb)
-        # print(self.bulk_interface)
+        #append ipmi interface to cms interface info, it does not exist in interfaces.csv but is created when added to lanDB so it exists there.
+        for name in self.ifnames:
+            if 'IPMI' in name:
+                ipminame = name.lower()
+                break
+            else:
+                None
 
+        devint_name = extract_dict.interfacenames(None, self.device_name)
+
+        if ipminame is not None:
+            ipmiIF = self.find_dict_by_entry(self.bulk_interface, "InterfaceName", devint_name)
+            if ipmiIF:
+                new_impiIF = copy.deepcopy(ipmiIF)
+                new_impiIF["InterfaceName"] = ipminame
+                
+                #check if ipmi interface already exists in bulk_interface
+                ipmi_exists = any(
+                        item.get("InterfaceName") == ipminame and "ipmi" in item.get("InterfaceName", "")
+                        for item in self.bulk_interface
+                        )
+                
+                if not ipmi_exists:
+                    self.bulk_interface.append(new_impiIF)
+
+        #location extracted empty from getbulkinterfaceinfo, replace with device info whihc has it filled in.
+        for interface in self.interfaces_landb:
+            if "Location" in interface:
+                interface["Location"] = self.device_input["Location"]
+
+        #first select interface with matching names in cms and landb database.
         for interface in self.bulk_interface:
             IFName = interface.get("InterfaceName")
-            find_correct_interface = self.find_dict_by_entry(interfaces_landb, "Name", IFName)
-            # print(find_correct_interface)
+            find_correct_interface = self.find_dict_by_entry(self.interfaces_landb, "InterfaceName", IFName)
             flat_cms_interfaces = self.iterate_nested_dicts(interface)
             flat_landb_interfaces = self.iterate_nested_dicts(find_correct_interface)
             matchingkeys = [key for key in flat_cms_interfaces.keys() if key in flat_landb_interfaces]
-            # print(matchingkeys)
-            # print(flat_cms_interfaces)
-            # print(flat_landb_interfaces)
-
-            #we have to map keys in order to compare values of parameters with different key names.
 
             try:
                 compare_IF = self.compare_dicts(
@@ -227,7 +254,7 @@ class cmsnet_check:
                     matching_keys= matchingkeys
                     )
                 
-                print(f"Differences found between lanDB database and CMS database for interface {IFName}:")
+                print(f"INTERFACE: Differences found between lanDB database and CMS database for interface {IFName}:")
                 if compare_IF == self.empty:
                     print(f"NO DIFFERENCES")
                 else:
@@ -236,7 +263,7 @@ class cmsnet_check:
             except Exception as e:
                 print(f"ERROR comparing device input paramaters to lanDB data for device {self.device_name}: {e}")
 
-        print(f"Device Input paramater comparison complete.")
+        print(f"Interface comparison complete.")
 
 def commandline():
     parser = argparse.ArgumentParser(description= "Compare information from CMS csv files to lanDB database for given device. Format: python3.11 CMSNet_ng_check.py device_name --function")
