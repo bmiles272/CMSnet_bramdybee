@@ -151,8 +151,6 @@ class cmsnet_check:
         flat_cms_devicesinput = self.iterate_nested_dicts(self.device_input)
         flat_landb_deviceinput = self.iterate_nested_dicts(self.device_landb)
         matchingkeys = set(flat_cms_devicesinput.keys()).intersection(set(flat_landb_deviceinput))
-        # print(matchingkeys)
-        # print(flat_landb_deviceinput)
 
         try:
             compare_devinp = self.compare_dicts(flatcms_data= flat_cms_devicesinput, flatlandb_data= flat_landb_deviceinput, matching_keys= matchingkeys)
