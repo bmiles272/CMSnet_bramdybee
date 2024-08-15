@@ -10,43 +10,21 @@ extract_dict = CSVtypes()
 bramdb = bramdybee.bramDB()
 conv = SUDS2Dict()
 
+
 '''
-plan for creating the check function:
-- check if the device exists using getinfo function, if it does not exist then advise going to add function
-- start to compare entries:
--- cards
--- interfaces
--- basic device info
-------------------------
-result:
-- check function individually checks in order: device input, network interface cards, device interfaces
-- basic structure for all checks:
----if there is more than 1 thing that needs checked (e.g device interface + ipmi interface), we get dicts in same format and match 
-   the objects in each database as often we do not get them in the same order
----flatten dicts (unnest every key), using iterator function.
----compare two flattened objects and flag any differences in values.
+Plan for update function:
 
-Certain values are changed/ignored:
-ServiceName == when this field is empty in CMS database lanDB automatically assigns basedon switch name
-IP, IPv6 == In CMS database these values are automatically None as lanDB fills them through some logic/calculation, no need to compare them
+- use check function or copy check function and chnage output given so its easy to update the function
+- write an update which uses output from chnaged check function to update parameters
 
-For interfaces, Location == getBulkInterfaceInfo returns empty location information, we use the device input location instead. 
-Could still be changed if interfaces can be found at different locations.
-
-OutletLabel == CMS database when no label present assigns 'auto' to this value, lanDB then gives a string of numbers after this, therefore
-it only checks if it begins with 'auto' as there is nothing to compare line of numbers to.
-
-Any integers (numbers) in either database are converted to strigs as they did not always match and strings and ints are not able to be compared.
-
-Any booleans (True/False) also converted to strings as when exporting from lanDB they appeared as strings while in CMS they stayed bools, easiest just to convert all to strings.
-
-Some ints chnaged as they are exported as e.g. 0001 instead of 1, zeros are removed and ints turned into strings as mentioned before.
+- check whether device exists in database and whether only 1 exists
+- check and update device info (deviceUpdate function)
+- check and updated 
 '''
 
-class cmsnet_check:
+class cmsnet_update:
 
     def __init__(self, device_name) -> None:
-        
         #check for the existance of device
         try:
             device_info = bramdb.landb.getDeviceInfo(device_name)
@@ -89,7 +67,6 @@ class cmsnet_check:
         self.device_name = device_name
         self.empty = {}
 
-    #iterates through dictionaries to unnest nested dicts (nested dicts are dictionaries within dictionaries)
     def iterate_nested_dicts(self, json_obj, root_key=None):
         results = {}
         
@@ -123,8 +100,6 @@ class cmsnet_check:
         #it also adjust values within dicts to be easily comparable
         differences = {}
 
-        #if value in cms is none then ignore as lanDB automatically assigns values through some calculation.
-        #servicename is only for when service name is not defined, when defined it will identify it.
         keys_none_cms = ['ServiceName', 'IP', 'IPv6']
         for key in keys_none_cms:
             if key in matching_keys and flatcms_data.get(key) is None:
@@ -164,99 +139,70 @@ class cmsnet_check:
 
         return differences
     
-    #Compare device input parameters
-    def compare_device_input(self):
-        flat_cms_devicesinput = self.iterate_nested_dicts(self.device_input)
-        flat_landb_deviceinput = self.iterate_nested_dicts(self.device_landb)
-        matchingkeys = set(flat_cms_devicesinput.keys()).intersection(set(flat_landb_deviceinput))
-
-        try:
-            compare_devinp = self.compare_dicts(flatcms_data= flat_cms_devicesinput, flatlandb_data= flat_landb_deviceinput, matching_keys= matchingkeys)
-            print(f"DEVICE INPUT: Differences found between lanDB database and CMS database for device {self.device_name}:")
-            if compare_devinp == self.empty:
-                print(f"NO DIFFERENCES")
-            else:
-                print(compare_devinp)
-            print(f"Device Input paramater comparison COMPLETE.")
-        except Exception as e:
-            print(f"ERROR comparing device input paramaters to lanDB data for device {self.device_name}: {e}")
-
-    def compare_interface_cards(self):
-        #load in lanDB and cms interface cards and flatten so that there are no nested values
-        network_interface_cards = self.device_landb.get("NetworkInterfaceCards", [])
-
-        for card in self.interface_cards:
-            mac = card.get("HardwareAddress")
-
-            try:
-                #Select the dict by the value of the hardware address in landb, once multiple NICs are added this become vital (we match so we dont compare NICs that aren't the same anyway)
-                find_correct_dict = self.find_dict_by_entry(network_interface_cards, "HardwareAddress", mac)
-                flat_landb_IFcards = self.iterate_nested_dicts(find_correct_dict)
-                flatcard = self.iterate_nested_dicts(card)
-                matchingkeys = [key for key in flatcard.keys() if key in flat_landb_IFcards]
-
-
-                try:
-                    #compare values from both dictioanries using matching keys
-                    compare_card = self.compare_dicts(
-                        flatcms_data= flatcard, 
-                        flatlandb_data= flat_landb_IFcards, 
-                        matching_keys= matchingkeys
-                        )
-                    
-                    print(f"NICs: Differences found between lanDB database and CMS database for device {self.device_name}:")
-                    if compare_card == self.empty:
-                        print(f"NO DIFFERENCES")
-                    else:
-                        print(compare_card)
-                    
-                except Exception as e:
-                    print(f"ERROR comparing device input paramaters to lanDB data for device {self.device_name}: {e}")
-            except Exception as e:
-                print(f"ERROR: {e}")
-    
-        print(f"Device Interface card comparison COMPLETE.")
-
-    #find a dictionary based on one of the entries in that dictionaries, used when matching the names to dicts as lanDB doesn't give them in same order as in cms data.
     def find_dict_by_entry(self, dict_list, key, value):
         for d in dict_list:
             if d.get(key, '').upper() == value.upper():
                 return d
         return None
+    
+    def update_device_info(self):
+        # First, compare the device input
+        flat_cms_devicesinput = self.iterate_nested_dicts(self.device_input)
+        flat_landb_deviceinput = self.iterate_nested_dicts(self.device_landb)
+        matchingkeys = set(flat_cms_devicesinput.keys()).intersection(set(flat_landb_deviceinput))
 
-    def compare_interfaces(self):
-        #append ipmi interface to cms interface info, it does not exist in interfaces.csv but is created when added to lanDB so it exists there.
+        try:
+            differences = self.compare_dicts(flatcms_data=flat_cms_devicesinput, flatlandb_data=flat_landb_deviceinput, matching_keys=matchingkeys)
+            if differences == self.empty:
+                print(f'Data matches, update not required')
+            else:
+                self.apply_updates(self.device_name, differences)
+            print(f"Device Input parameter update COMPLETE.")
+
+        except Exception as e:
+            print(f"ERROR updating device input parameters in lanDB for device {self.device_name}: {e}")
+
+    def update_interface_cards(self):
+        network_interface_cards = self.device_landb.get("NetworkInterfaceCards", [])
+
+        for card in self.interface_cards:
+            mac = card.get("HardwareAddress")
+            try:
+                find_correct_dict = self.find_dict_by_entry(network_interface_cards, "HardwareAddress", mac)
+                flat_landb_IFcards = self.iterate_nested_dicts(find_correct_dict)
+                flatcard = self.iterate_nested_dicts(card)
+                matchingkeys = [key for key in flatcard.keys() if key in flat_landb_IFcards]
+
+                differences = self.compare_dicts(flatcms_data=flatcard, flatlandb_data=flat_landb_IFcards, matching_keys=matchingkeys)
+                if differences:
+                    self.apply_updates(self.device_name, differences, type="NIC")
+            except Exception as e:
+                print(f"ERROR updating network interface cards in lanDB for device {self.device_name}: {e}")
+        
+        print(f"Device Interface card update COMPLETE.")
+
+    def update_interfaces(self):
+        # Append ipmi interface to cms interface info
         for name in self.ifnames:
             if 'IPMI' in name:
                 ipminame = name.lower()
                 break
-            else:
-                None
 
         devint_name = extract_dict.interfacenames(None, self.device_name)
 
-        if ipminame is not None:
+        if ipminame:
             ipmiIF = self.find_dict_by_entry(self.bulk_interface, "InterfaceName", devint_name)
             if ipmiIF:
                 new_impiIF = copy.deepcopy(ipmiIF)
                 new_impiIF["InterfaceName"] = ipminame
-                
-                #check if ipmi interface already exists in bulk_interface, if so no need to add it.
-                ipmi_exists = any(
-                        item.get("InterfaceName") == ipminame and "ipmi" in item.get("InterfaceName", "")
-                        for item in self.bulk_interface
-                        )
-                
+                ipmi_exists = any(item.get("InterfaceName") == ipminame and "ipmi" in item.get("InterfaceName", "") for item in self.bulk_interface)
                 if not ipmi_exists:
                     self.bulk_interface.append(new_impiIF)
 
-        #location extracted from lanDB is empty for all interfaces when obtained through getbulkinterfaceinfo, replace with device info which has it filled in.
-        #might need changed if interfaces are at different locations
         for interface in self.interfaces_landb:
             if "Location" in interface:
                 interface["Location"] = self.device_input["Location"]
 
-        #first select interface with matching names in cms and landb database.
         for interface in self.bulk_interface:
             IFName = interface.get("InterfaceName")
             find_correct_interface = self.find_dict_by_entry(self.interfaces_landb, "InterfaceName", IFName)
@@ -265,35 +211,36 @@ class cmsnet_check:
             matchingkeys = [key for key in flat_cms_interfaces.keys() if key in flat_landb_interfaces]
 
             try:
-                compare_IF = self.compare_dicts(
-                    flatcms_data= flat_cms_interfaces, 
-                    flatlandb_data= flat_landb_interfaces, 
-                    matching_keys= matchingkeys
-                    )
-                
-                print(f"INTERFACE: Differences found between lanDB database and CMS database for interface {IFName}:")
-                if compare_IF == self.empty:
-                    print(f"NO DIFFERENCES")
-                else:
-                    print(compare_IF)
-
+                differences = self.compare_dicts(flatcms_data=flat_cms_interfaces, flatlandb_data=flat_landb_interfaces, matching_keys=matchingkeys)
+                if differences:
+                    self.apply_updates(IFName, differences, type="Interface")
             except Exception as e:
-                print(f"ERROR comparing device input paramaters to lanDB data for device {self.device_name}: {e}")
+                print(f"ERROR updating interfaces in lanDB for device {self.device_name}: {e}")
 
-        print(f"Interface comparison complete.")
+        print(f"Interface update COMPLETE.")
 
-def commandline():
-    parser = argparse.ArgumentParser(description= "Compare information from CMS csv files to lanDB database for given device. Format: python3.11 CMSNet_ng_check.py device_name --function")
-    parser.add_argument('device_name', type=str, help='The name of the device to manage.')
-    parser.add_argument('--check', action='store_true', help='Check for differences in device information.')
-
-    args = parser.parse_args()
-    cmsnet = cmsnet_check(args.device_name)
-
-    if args.check:
-        cmsnet.compare_device_input()
-        cmsnet.compare_interface_cards()
-        cmsnet.compare_interfaces()
-
-if __name__ == "__main__":
-    commandline()
+    def apply_updates(self, name, updates, type="Device"):
+        try:
+            if type == "Device":
+                # Apply updates to the device info in lanDB
+                for key, value in updates.items():
+                    # Assuming bramdb.landb.updateDeviceInfo is the method to update device info
+                    bramdb.landb.updateDeviceInfo(name, key, value['CMS database'])
+                print(f"Updated device {name} in lanDB.")
+            
+            elif type == "NIC":
+                # Apply updates to the network interface cards in lanDB
+                for key, value in updates.items():
+                    # Assuming bramdb.landb.updateNIC is the method to update NIC info
+                    bramdb.landb.updateNIC(name, key, value['CMS database'])
+                print(f"Updated NIC for device {name} in lanDB.")
+            
+            elif type == "Interface":
+                # Apply updates to the interfaces in lanDB
+                for key, value in updates.items():
+                    # Assuming bramdb.landb.updateInterface is the method to update Interface info
+                    bramdb.landb.updateInterface(name, key, value['CMS database'])
+                print(f"Updated interface {name} in lanDB.")
+            
+        except Exception as e:
+            print(f"Failed to update {type} {name} in lanDB: {e}")
