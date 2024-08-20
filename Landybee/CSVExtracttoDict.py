@@ -342,12 +342,14 @@ class CSVtypes:
         if IFname != None:
             split_IFname = IFname.split('.')
             if len(split_IFname) == 1:   #for gpn domain (.cern.ch)
-                updatedname = device_name
+                updatedname = IFname
             if len(split_IFname) == 2:     #for any subdomains within cms (-subdomain--cms)
                 updatedname = device_name + self.subdomain_delimiter + split_IFname[1] + self.domain_delimiter + self.cmsdomain
         elif IFname == None:
             updatedname = device_name + self.domain_delimiter + self.cmsdomain #devices in cms domain with no subdomain (--cms)
         return updatedname + self.cerndomain
+    
+    
     
     def BulkInterface(self, device_name): 
         interfaces = []               

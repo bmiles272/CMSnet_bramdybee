@@ -85,6 +85,37 @@ class cmsnet_check:
         except Exception as e:
             print(f"ERROR: {e}")
 
+
+        #adding ipmi interface and locations for interfaces as they dont exist within cms database but are present in lanDB
+        #where they are added in the cmsnet_add.py
+        # Append ipmi interface to cms interface info
+        for name in self.ifnames:
+            if 'IPMI' in name:
+                ipminame = name.lower()
+                break
+            else:
+                None
+
+        devint_name = extract_dict.interfacenames(None, device_name)
+
+        if ipminame is not None:
+            ipmiIF = self.find_dict_by_entry(self.bulk_interface, "InterfaceName", devint_name)
+            if ipmiIF:
+                new_impiIF = copy.deepcopy(ipmiIF)
+                new_impiIF["InterfaceName"] = ipminame
+
+                #check ipmi interface already exists
+                ipmi_exists = any(item.get("InterfaceName") == ipminame and "ipmi" in item.get("InterfaceName", "") for item in self.bulk_interface)
+
+                if not ipmi_exists:
+                    self.bulk_interface.append(new_impiIF)
+
+        #use device information location to append to interface so that we can compare it to lanDB information.
+        for interface in self.interfaces_landb:
+            if "Location" in interface:
+                interface["Location"] = self.device_input["Location"]
+
+        #generate some useful parameters used later
         self.interfaces_landb = intf_list
         self.device_name = device_name
         self.empty = {}
@@ -195,7 +226,6 @@ class cmsnet_check:
                 flatcard = self.iterate_nested_dicts(card)
                 matchingkeys = [key for key in flatcard.keys() if key in flat_landb_IFcards]
 
-
                 try:
                     #compare values from both dictioanries using matching keys
                     compare_card = self.compare_dicts(
@@ -225,37 +255,6 @@ class cmsnet_check:
         return None
 
     def compare_interfaces(self):
-        #append ipmi interface to cms interface info, it does not exist in interfaces.csv but is created when added to lanDB so it exists there.
-        for name in self.ifnames:
-            if 'IPMI' in name:
-                ipminame = name.lower()
-                break
-            else:
-                None
-
-        devint_name = extract_dict.interfacenames(None, self.device_name)
-
-        if ipminame is not None:
-            ipmiIF = self.find_dict_by_entry(self.bulk_interface, "InterfaceName", devint_name)
-            if ipmiIF:
-                new_impiIF = copy.deepcopy(ipmiIF)
-                new_impiIF["InterfaceName"] = ipminame
-                
-                #check if ipmi interface already exists in bulk_interface, if so no need to add it.
-                ipmi_exists = any(
-                        item.get("InterfaceName") == ipminame and "ipmi" in item.get("InterfaceName", "")
-                        for item in self.bulk_interface
-                        )
-                
-                if not ipmi_exists:
-                    self.bulk_interface.append(new_impiIF)
-
-        #location extracted from lanDB is empty for all interfaces when obtained through getbulkinterfaceinfo, replace with device info which has it filled in.
-        #might need changed if interfaces are at different locations
-        for interface in self.interfaces_landb:
-            if "Location" in interface:
-                interface["Location"] = self.device_input["Location"]
-
         #first select interface with matching names in cms and landb database.
         for interface in self.bulk_interface:
             IFName = interface.get("InterfaceName")
