@@ -45,7 +45,7 @@ class cmsnet_update:
         self.interface_cards = extract_dict.CombinedInterfaceCards(device_name)
 
         #load in bulk interface information for each interface in a device.   
-        #finds interface names from lanDB  
+        #finds interface names from lanDB.
         try:
             self.ifnames = []
             interfaces_landb = self.device_landb.get("Interfaces")
@@ -364,16 +364,17 @@ class cmsnet_update:
 
 def commandline():
     parser = argparse.ArgumentParser(description= "Compare information from CMS csv files to lanDB database for given device. Format: python3.11 CMSNet_ng_update.py device_name --function")
-    parser.add_argument('device_name', type=str, help='The name of the device to manage.')
+    parser.add_argument('device_names', nargs='+', type=str, help= 'Name(s) of the device to manage.')
     parser.add_argument('--update', action='store_true', help='Check and update device information for given device.')
 
     args = parser.parse_args()
-    cmsnet = cmsnet_update(args.device_name)
+    for device_name in args.device_names:
+        cmsnet = cmsnet_update(device_name)
 
-    if args.update:
-        cmsnet.update_device_info()
-        cmsnet.update_interface_cards()
-        cmsnet.update_interfaces()
+        if args.update:
+            cmsnet.update_device_info()
+            cmsnet.update_interface_cards()
+            cmsnet.update_interfaces()
 
 if __name__ == "__main__":
     commandline()

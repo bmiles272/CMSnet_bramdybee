@@ -177,8 +177,8 @@ class cmsnet_add:
 
 def commandline():
     parser = argparse.ArgumentParser(description= "Add devices from the CMS csv databases to the lanDB CERN database. Format: python3.11 CMSNet_ng_add.py device_name --function.")
-    parser.add_argument('device_name', type=str, help='The name of the device to manage.')
-    parser.add_argument('--insert', action='store_true', help='Insert device information.')
+    parser.add_argument('device_names', nargs='+', type=str, help='The names of the devices to manage.')
+    parser.add_argument('--insert', action='store_true', help='Insert device information into lanDB.')
     parser.add_argument('--add-card', action='store_true', help='Add interface cards to the device.')
     parser.add_argument('--add-bulk-interface', action='store_true', help='Add bulk interfaces to the device.')
     parser.add_argument('--add', action='store_true', help='Call all functions: adds a device to the lanDB database with information from the CMS .csv files.')
@@ -186,34 +186,35 @@ def commandline():
 
     global args
     args = parser.parse_args()
-    cmsnet = cmsnet_add(args.device_name)
+    for device_name in args.device_names:
+        cmsnet = cmsnet_add(device_name)
 
-    if args.add:
-        cmsnet.deviceInsert()
-        if args.print_info:
-            cmsnet.printdevinfo()
-        cmsnet.deviceAddCard()
-        if args.print_info:
-            cmsnet.printIFcard()
-        cmsnet.deviceAddBulkInterface()
-        if args.print_info:
-            cmsnet.printbulkinterface()
- 
-    else:
-        if args.insert:
+        if args.add:
             cmsnet.deviceInsert()
             if args.print_info:
                 cmsnet.printdevinfo()
-        
-        if args.add_card:
             cmsnet.deviceAddCard()
             if args.print_info:
                 cmsnet.printIFcard()
-        
-        if args.add_bulk_interface:
             cmsnet.deviceAddBulkInterface()
             if args.print_info:
                 cmsnet.printbulkinterface()
+    
+        else:
+            if args.insert:
+                cmsnet.deviceInsert()
+                if args.print_info:
+                    cmsnet.printdevinfo()
+            
+            if args.add_card:
+                cmsnet.deviceAddCard()
+                if args.print_info:
+                    cmsnet.printIFcard()
+            
+            if args.add_bulk_interface:
+                cmsnet.deviceAddBulkInterface()
+                if args.print_info:
+                    cmsnet.printbulkinterface()
 
 
 if __name__ == "__main__":

@@ -283,16 +283,17 @@ class cmsnet_check:
 
 def commandline():
     parser = argparse.ArgumentParser(description= "Compare information from CMS csv files to lanDB database for given device. Format: python3.11 CMSNet_ng_check.py device_name --function")
-    parser.add_argument('device_name', type=str, help='The name of the device to manage.')
+    parser.add_argument('device_names', nargs='+', type=str, help='The names of the devices to check.')
     parser.add_argument('--check', action='store_true', help='Check for differences in device information.')
 
     args = parser.parse_args()
-    cmsnet = cmsnet_check(args.device_name)
+    for device_name in args.device_names:
+        cmsnet = cmsnet_check(device_name)
 
-    if args.check:
-        cmsnet.compare_device_input()
-        cmsnet.compare_interface_cards()
-        cmsnet.compare_interfaces()
+        if args.check:
+            cmsnet.compare_device_input()
+            cmsnet.compare_interface_cards()
+            cmsnet.compare_interfaces()
 
 if __name__ == "__main__":
     commandline()
