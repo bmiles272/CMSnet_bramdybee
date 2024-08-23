@@ -62,15 +62,24 @@ class cmsnet_extract:
         #write dhcp file
         os.makedirs("build/var/dhcp/", exist_ok=True)
 
-        for i in sorted(dhcp.keys()):
-            with open(f"build.var/dhcp/{self.domain}.{i}.dhcp", "w") as dhcp_fh:
-                dhcp_fh.write(dhcp[i])
+        for i, dhcp_entries in dhcp.items():
+            filepath = f"build/var/dhcp/{self.domain}.{i}.dhcp"
+            with open(filepath, "w") as dhcp_fh:
+                for entry in dhcp_entries:
+                    dhcp_fh.write(entry + "\n")
+                print(f"File {i} created.")
     
     def split_list(self, lst, section_length):
         return [lst[i:i + section_length] for i in range(0, len(lst), section_length)]
 
     def process_normal_cases(self):
         self.devices_by_group = {
+        'dcs': [],
+        'cc8': [],
+        'juniper': [],
+        'misc': []
+    }
+        self.dhcp = {
         'dcs': [],
         'cc8': [],
         'juniper': [],
@@ -100,58 +109,52 @@ class cmsnet_extract:
                     IFs = devinfo_dict.get("Interfaces")
                     correct_IF = self.find_dict_by_entry(IFs, 'Name', IF_name)
                     os = devinfo_dict.get("OperatingSystem")
+                    # print(correct_IF)
 
                     if correct_IF:
-                        ip = correct_IF.get("IPAddress")
-                        # print(ip)
+                        IPaddress = correct_IF.get("IPAddress")
                         boundinterface = correct_IF.get("BoundInterfaceCard")
-                        mac = correct_IF.get("HardwareAddress") if boundinterface else None
-                        # print(mac)
-                        subnetmask = correct_IF.get("SubnetMask")
-                        # print(subnetmask)
-                        defaultgateway = correct_IF.get("DefaultGateway")
-                        # print(defaultgateway)
-
-                        #append the device names to each respective file
-                        if os.get("Name") == "WINDOWS":
-                            self.devices_by_group['dcs'].append(dev_name)
-                        if os.get("Version") in cc8_versions:
-                            self.devices_by_group['cc8'].append(dev_name)
-                        if devinfo_dict.get("Manufacturer") == "JUNIPER":
-                            self.devices_by_group['juniper'].append(dev_name)
+                        if boundinterface is None:
+                            print(f"Device {dev_name} ignored, no hardware address present.")
+                            continue
                         else:
-                            self.devices_by_group['misc'].append(dev_name)
-                    else:
-                        print(dev_name)
-                        ip = mac = subnetmask = defaultgateway = None
+                            mac = boundinterface.get("HardwareAddress")
+                            netmask = correct_IF.get("SubnetMask")
+                            # print(netmask)
+                            defaultgateway = correct_IF.get("DefaultGateway")
+                            # print(defaultgateway)
 
-                    
-                    
+                            #append the device names to each respective file
+                            if os.get("Name") == "WINDOWS":
+                                self.devices_by_group['dcs'].append(dev_name)
+                                group = 'dcs'
+                            elif os.get("Version") in cc8_versions:
+                                self.devices_by_group['cc8'].append(dev_name)
+                                group = 'cc8'
+                            elif devinfo_dict.get("Manufacturer") == "JUNIPER":
+                                self.devices_by_group['juniper'].append(dev_name)
+                                group = 'juniper'
+                            else:
+                                self.devices_by_group['misc'].append(dev_name)
+                                group = 'misc'
+                    # else:
+                    #     print(dev_name)
+                    #     IPaddress = mac = netmask = defaultgateway = None
+                    try:
+                        self.add_dhcp(dev_name, IPaddress, mac,  netmask, defaultgateway, group) 
+                    except Exception as e:
+                        print(f"ERROR creating dhcp format: {e}")                   
                     
             except Exception as e:
                 print(f"ERROR getting device info: {e}")
 
         print("self.devices_by_group created")
 
-        for group, device_list in self.devices_by_group.items():
-            for device in device_list:
-                try:
-                    DHCP = self.add_dhcp(device_name= device,
-                                  IP= ip,
-                                  MAC= mac,
-                                  group= group,
-                                  netmask= subnetmask,
-                                  def_gateway= defaultgateway,
-                                  dhcp= self.devices_by_group)
-                    
-                except Exception as e:
-                    print(f"ERROR retreiving DHCP config: {e}") 
-        
-        print(DHCP["juniper"])
+        self.create_files(self.dhcp)
 
 
-    def broadcast_address(self, mask, def_gateway, ip):
-        if mask is not None and def_gateway is not None and ip is not None:
+    def broadcast_address(self, mask, ip):
+        if mask is not None and ip is not None:
                   # Splitting up netMask and IP address using regex
             match = re.match(r"(\d+)\.(\d+)\.(\d+)\.(\d+)\|(\d+)\.(\d+)\.(\d+)\.(\d+)", f"{mask}|{ip}")
             
@@ -173,26 +176,21 @@ class cmsnet_extract:
 
     #might need to initialise dhcp outside the function populated by device names within groups within the domain
 
-    def add_dhcp(self, device_name, IP, MAC, group, netmask, def_gateway, dhcp):
-        entries = [device_name, IP, MAC, group, netmask, def_gateway, dhcp]
-        if any(arg is None for arg in entries):
-            print("Missing arguments in: 'add_dhcp'")
+    def add_dhcp(self, device_name, ip, mac, subnetmask, def_gateway, group):
+        if not all([device_name, ip, mac, subnetmask, def_gateway]):
+            print(f"Skipping DHCP entry for {device_name} due to missing information.")
             return
 
         mac = mac.replace('.', ':').replace('-', ':')
-        broadcast = self.broadcast_address(mask=netmask, 
-                                           def_gateway=def_gateway,
-                                           ip= IP)
+        broadcast = self.broadcast_address(subnetmask, ip)
 
-        if group in dhcp and f"host {device_name}" in dhcp[group]:
-            print(f"Cannot add DHCP for {device_name}: entry already exists.")
+        dhcp_entry = (
+            f"host {device_name} {{ hardware ethernet {mac}; fixed-address {ip}; "
+            f"option host-name {device_name}; option subnet-mask {subnetmask}; "
+            f"option broadcast-address {broadcast}; option routers {def_gateway}; }}\n"
+        )
+
+        if group in self.dhcp:
+            self.dhcp[group].append(dhcp_entry)
         else:
-            print(f"Add DHCP: {device_name}: {IP}: {mac} (group: {group})")
-
-            dhcp_entry = (f"host {device_name} {{ hardware ethernet {mac}; fixed-address {IP}; "
-                      f"option host-name {device_name}; option subnet-mask {netmask}; "
-                      f"option broadcast-address {broadcast}; option routers {def_gateway}; }}\n")
-            if group in dhcp:
-                dhcp[group] += dhcp_entry
-            else:
-                dhcp[group] = dhcp_entry
+            self.dhcp[group] = [dhcp_entry]
