@@ -21,6 +21,7 @@ conv = SUDS2Dict()
 class cmsnet_extract:
 
     def __init__(self, domain: str) -> None:
+
         ip_ranges_cms = ("10.176.", "10.184.32.")
         ip_ranges_904 = ("10.192.")
         self.domain = domain.upper()
@@ -74,7 +75,8 @@ class cmsnet_extract:
                 for entry in dhcp_entries:
                     dhcp_fh.write(entry)
                 print(f"File {filepath} created.")
-    
+
+
     def split_list(self, lst, section_length):
         return [lst[i:i + section_length] for i in range(0, len(lst), section_length)]
     
@@ -94,8 +96,11 @@ class cmsnet_extract:
                         if len(fallback_networkinterfaces) == 1:
                             mac = fallback_networkinterfaces[0].get("HardwareAddress") #to be chnaged
                         else:
-                            mac = fallback_networkinterfaces[0].get("HardwareAddress") if fallback_networkinterfaces else None   #to be changed
+                            # mac = fallback_networkinterfaces[0].get("HardwareAddress") if fallback_networkinterfaces else None   #to be changed
+                            print(f"No specific hardware address able to be found for device {dev_name}")
+                            mac=None
                     else:
+                        print(f"No hardware address present for device {dev_name}")
                         mac = None
             else:
                 #if interface is None then set all values to None before checking next interfaces
@@ -141,7 +146,10 @@ class cmsnet_extract:
                 ipmi_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.ipmi_IF_domain)
                 if ipmi_interface:
                     ip_address, mac, netmask, default_gateway = get_interface_info(ipmi_interface, interfacecards)
-                    self.add_dhcp(device_name=dev_name +'-ipmi', ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group='misc-ipmi')
+                    if ip_address and mac and netmask and default_gateway:
+                        self.add_dhcp(device_name=dev_name +'-ipmi', ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group='misc-ipmi')
+                    else:
+                        print(f"Ipmi interface {dev_name + self.ipmi_IF_domain} not added to DHCP as it has missing entries.")
 
                 # search for main interface
                 primary_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.IF_domain)
@@ -156,30 +164,38 @@ class cmsnet_extract:
                 if not ip_address and not mac:
                     hcpinfo = bramdb.landb.getHCPInfoArray([dev_name])
                     if hcpinfo:
-                        hcp_dict = json.loads(conv.sobject_to_json(hcpinfo[0]))  #again to be changed
-                        ip_address = hcp_dict.get("IP")
-                        mac = hcp_dict.get("HardwareAddress")
-                        netmask = hcp_dict.get("Mask")
-                        default_gateway = hcp_dict.get("GatewayAddress")
+                        if len(hcpinfo) == 1:
+                            hcp_dict = json.loads(conv.sobject_to_json(hcpinfo[0]))  #again to be changed
+                            ip_address = hcp_dict.get("IP")
+                            mac = hcp_dict.get("HardwareAddress")
+                            netmask = hcp_dict.get("Mask")
+                            default_gateway = hcp_dict.get("GatewayAddress")
+                        else:
+                            print(f"Not able to specify interface or hardware address for device {dev_name}")
+                            netmask = default_gateway = ip_address = mac = None
                     else:
                         print(f"WARNING: Device {dev_name} has a hardware address that cannot be tracked down.")
-                        continue  # Skip this device
+                        netmask = default_gateway = ip_address = mac = None
+
 
                 # Categorize the device and add DHCP information
-                group = categorize_device(os, manufacturer, devinfo_dict)
-
-                self.add_dhcp(device_name=dev_name, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
+                if ip_address and mac and netmask and default_gateway:
+                    group = categorize_device(os, manufacturer, devinfo_dict)
+                    self.add_dhcp(device_name=dev_name, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
+                else:
+                    print(f"WARNING device {dev_name} not added to DHCP as it has missing entries")
 
         self.create_files(self.dhcp)
 
         end_time = time.time()  # End timing
         runtime = end_time - start_time
+        print(f"Succesfully generated DHCP files.")
         print(f"Process completed in {runtime:.2f} seconds")
 
 
 
     def broadcast_address(self, mask, ip):
-        if mask is not None and ip is not None:
+        if mask and ip:
                   # Splitting up netMask and IP address using regex
             match = re.match(r"(\d+)\.(\d+)\.(\d+)\.(\d+)\|(\d+)\.(\d+)\.(\d+)\.(\d+)", f"{mask}|{ip}")
             
