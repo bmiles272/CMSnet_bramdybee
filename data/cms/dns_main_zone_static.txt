@@ -1,0 +1,20 @@
+localhost			A	127.0.0.1
+
+ldap			IN	A	10.176.150.64
+_ldap.cms		IN	SRV	0 0 389 ldap
+_ldap._udp		IN	SRV	0 0 389 ldap
+_ldap._tcp		IN	SRV	0 0 389 ldap
+
+kerberos		IN	A	10.176.150.64
+_kerberos.cms		IN	TXT	"CMS"
+_kerberos._udp		IN	SRV	0 0 88  kerberos
+_kerberos._tcp		IN	SRV	0 0 88  kerberos
+_kerberos-adm._tcp	IN	SRV	0 0 749 kerberos
+_kpasswd._udp		IN	SRV	0 0 464 Kerberos
+
+grafana-initial-playground-001-k8s.cms           IN      A       10.176.152.174
+prometheus-initial-playground-001-k8s.cms        IN      A       10.176.152.174
+
+grafana-cdaq-initial-playground-001-k8s.cms      IN      A       10.176.152.174
+prometheus-cdaq-initial-playground-001-k8s.cms   IN      A       10.176.152.174
+alertmanager-initial-playground-001-k8s.cms      IN      A       10.176.152.174

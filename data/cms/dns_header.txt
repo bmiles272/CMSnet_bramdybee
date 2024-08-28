@@ -1,0 +1,12 @@
+$TTL 1D
+@           IN  SOA  srv-c2e47-26-01.cms. root.srv-c2e47-26-01.cms. (
+              0000000000  ; Serial
+              2H          ; Refresh
+              15M         ; Retry
+              1W          ; Expire
+              1D          ; Minimum TTL
+            )
+            IN  NS  kvm-s3562-1-ip156-50.cms.
+            IN  NS  kvm-s3562-1-ip157-42.cms.
+            IN  NS  srv-c2e46-26-01.cms.
+            IN  NS  ucsrv-s2d19-32-01.cms.
