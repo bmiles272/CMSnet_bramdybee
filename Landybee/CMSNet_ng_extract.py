@@ -62,7 +62,7 @@ class cmsnet_extract:
                     return d
         return None
 
-    def create_files(self, subdomain_dict):
+    def create_files(self, subdomain_dict, zone_dict):
         #generate the files
 
         shutil.rmtree("build", ignore_errors=True)
@@ -83,6 +83,10 @@ class cmsnet_extract:
         # Write to the main zone file
         for subdomain, devices in subdomain_dict.items():
             sub_domain_file = f"build/var/named/master/{subdomain}.{self.domainlow}"
+            #for cms file we dont want cms.cms
+            if subdomain == self.domainlow:
+                sub_domain_file = f"build/var/named/master/{subdomain}"
+            #begin to write info into file
             try:
                 with open(sub_domain_file, 'w') as file:
 
@@ -90,13 +94,38 @@ class cmsnet_extract:
                     file.write(self.read_zone_header())
                     if subdomain == self.domainlow:
                         file.write(self.read_static_info())
+                        file.write("\n")
+                        file.write(self.read_rr_alias())
+                        file.write("\n")
 
                     #input device to ip
                     for name, ip in devices:
                         file.write(f"{name}\t\t\t\tIN\tA\t{ip}\n")
-                        print(f"File {sub_domain_file} created.")
+                    print(f"File {sub_domain_file} created.")
+
             except IOError as e:
                 print(f"Can't open main zone file: {str(e)}")
+
+
+            #write reverseip files
+            for zone, elements in zone_dict.items():
+                zone_reverseip_file = f"build/var/named/master/{zone}.in-addr.arpa"
+               
+                #begin to write info into file
+                try:
+                    with open(zone_reverseip_file, 'w') as file:
+
+                        #write zone header and static info
+                        file.write(self.read_zone_header())
+                        
+                        #input reverse IP to device
+                        for revIP, interface in elements:
+                            file.write(f"{revIP}\t\t\t\t\tPTR\t{interface}\n")
+                        print(f"File {zone_reverseip_file} created.")
+
+                except IOError as e:
+                    print(f"Can't open zone file: {str(e)}")
+
 
     def split_list(self, lst, section_length):
         return [lst[i:i + section_length] for i in range(0, len(lst), section_length)]
@@ -135,6 +164,19 @@ class cmsnet_extract:
         except Exception as e:
             print(f"ERROR opening file {static_info_path}")
         return static_info
+    
+    def read_rr_alias(self):
+        rr_alias = ""
+        alias_path = "data/cms/dns_rr_alias.txt"
+        try:
+            with open(alias_path, 'r') as aliasfile:
+                for line in aliasfile:
+                    rr_alias += line
+            
+
+        except Exception as e:
+            print(f"ERROR opening file {alias_path}")
+        return rr_alias
 
     
     def populate(self):
@@ -180,6 +222,17 @@ class cmsnet_extract:
                 group = 'misc'
             self.devices_by_group[group].append(device_name)
             return group
+        
+        def reverse_ip(ip_address):
+            #split IP into 4 at the dot
+            quarters = ip_address.split(".")
+
+            reversed_ip = f"{quarters[3]}.{quarters[2]}"
+
+            zone = f"{quarters[1]}.{quarters[0]}"
+
+            return zone, reversed_ip
+
 
         
         start_time = time.time()
@@ -191,6 +244,7 @@ class cmsnet_extract:
         devices = self.domain_devices(self.domain)
         split_devices = self.split_list(devices, 200)
         subdomain_dict = {}
+        zone_dict = {}
 
         for sub_devices in split_devices:
             device_info = bramdb.landb.getDeviceInfoArray(sub_devices)
@@ -210,10 +264,24 @@ class cmsnet_extract:
                 for interface in interfaces:
                     pattern = re.compile(r'([^-]+)(?:-([^-]+))?--cms\.cern\.ch', re.IGNORECASE)
                     interface_name = interface.get("Name")
+                    IPadd = interface.get("IPAddress")
+                    #get reverse IP address and zone in which it exists
+                    
+                    zone, ipreverse = reverse_ip(IPadd)
+                    if zone not in zone_dict:
+                        zone_dict[zone] = []
+                    zone_dict[zone].append((ipreverse, interface_name))
+                    
+
+
                     devlower = str(dev_name).lower()
+                    #remove --cms from end of each entry
                     if devlower.endswith('--cms'):
                         devlower = devlower[:-5]
-                    IPadd = interface.get("IPAddress")
+                    
+
+
+
                     match = pattern.search(interface_name)
                     if match:
                         subdomain = str(match.group(2)).lower() if match.group(2) else None
@@ -240,7 +308,7 @@ class cmsnet_extract:
                             print(f"Interface {interface_name} does not match the criteria: {e}")
 
                         
-
+                #ipmi interfaces checked first and pushed into misc-ipmi.dhcp file
                 ipmi_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.ipmi_IF_domain)
                 if ipmi_interface:
                     ip_address, mac, netmask, default_gateway = get_interface_info(ipmi_interface, interfacecards)
@@ -290,7 +358,7 @@ class cmsnet_extract:
                     continue
         
         # print(subdomain_dict)
-        self.create_files(subdomain_dict)
+        self.create_files(subdomain_dict, zone_dict)
 
         end_time = time.time()  # End timing
         runtime = end_time - start_time
