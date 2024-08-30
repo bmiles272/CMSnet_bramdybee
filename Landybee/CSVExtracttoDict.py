@@ -297,7 +297,7 @@ class CSVtypes:
                                 'Model': row['<model>'],
                                 'Description': row['<Description>'] if '<Description>' in row else None,
                                 'Tag': row['<Tag>'] if '<Tag>' in row else None,
-                                'SerialNumber': row['<SerialNumber>'] if '<SerialNumber>' in row else None,
+                                'SerialNumber': row['<Serial>'] if '<Serial>' in row else None,
                                 'OperatingSystem': self.OperatingSystem(device),
                                 'InventoryNumber': row['<InventoryNumber>'] if '<InventoryNumber>' in row else None,
                                 'LandbManagerPerson': self.PersonInput(device) if self.PersonInput != None else None,
@@ -320,7 +320,7 @@ class CSVtypes:
                             'Model': row['<model>'],
                             'Description': row['<Description>'] if '<Description>' in row else None,
                             'Tag': row['<Tag>'] if '<Tag>' in row else None,
-                            'SerialNumber': row['<SerialNumber>'] if '<SerialNumber>' in row else None,
+                            'SerialNumber': row['<Serial>'] if '<Serial>' in row else None,
                             'OperatingSystem': self.OperatingSystem(device_name),
                             'InventoryNumber': row['<InventoryNumber>'] if '<InventoryNumber>' in row else None,
                             'LandbManagerPerson': self.PersonInput(device_name) if self.PersonInput != None else None,
@@ -349,7 +349,7 @@ class CSVtypes:
             updatedname = device_name + self.domain_delimiter + self.cmsdomain #devices in cms domain with no subdomain (--cms)
         return updatedname + self.cerndomain
     
-    
+
     
     def BulkInterface(self, device_name): 
         interfaces = []               

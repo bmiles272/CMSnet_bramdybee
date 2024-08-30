@@ -11,6 +11,7 @@ import shutil
 import re
 import json
 import argparse
+import pandas as pd
 import time
 from bramdybee import bramDB
 from ConvSUDStoDict import SUDS2Dict
@@ -34,7 +35,7 @@ class cmsnet_extract:
 
         self.dhcp = []
 
-        domainlength = len(self.domain_devices(domain))
+        domainlength = len(self.domain_devices(domain= self.domain))
 
         #check whether domain given is valid, if not give valid one.
         if domain not in domains:
@@ -43,12 +44,13 @@ class cmsnet_extract:
         else:
             print(f"Domain {domain} is valid and contains {domainlength} devices.")
 
+
     def domain_devices(self, domain):
         dmn_dict = {"Domain": domain}
         try:
             domain_list = bramdb.landb.searchDevice(dmn_dict)
         except Exception as e:
-            print(f"ERROR obtaining list of device names from domain {domain}")
+            print(f"ERROR obtaining list of device names from domain {domain}: {e}")
         return domain_list
     
     def find_dict_by_entry(self, dict_list, key, value):
@@ -62,7 +64,7 @@ class cmsnet_extract:
                     return d
         return None
 
-    def create_files(self, subdomain_dict, zone_dict):
+    def create_files(self, subdomain_dict, zone_dict, alias_dict):
         #generate the files
 
         shutil.rmtree("build", ignore_errors=True)
@@ -79,28 +81,61 @@ class cmsnet_extract:
 
 
         #Write DNS files
-        os.makedirs("build/var/named/master/", exist_ok=True)
-        # Write to the main zone file
-        for subdomain, devices in subdomain_dict.items():
+        # os.makedirs("build/var/named/master/", exist_ok=True)
+        # # Write to the main zone file
+        # for subdomain, devices in subdomain_dict.items():
+        #     sub_domain_file = f"build/var/named/master/{subdomain}.{self.domainlow}"
+        #     #for cms file we dont want cms.cms
+        #     if subdomain == self.domainlow:
+        #         sub_domain_file = f"build/var/named/master/{subdomain}"
+        #     #begin to write info into file
+        #     try:
+        #         with open(sub_domain_file, 'w') as file:
+
+        #             #write zone header and static info
+        #             file.write(self.read_zone_header())
+        #             if subdomain == self.domainlow:
+        #                 file.write(self.read_static_info())
+        #                 file.write("\n")
+        #                 file.write(self.read_rr_alias())
+        #                 file.write("\n")
+
+        #             #input device to ip
+        #             for name, ip in devices:
+        #                 file.write(f"{name}\t\t\t\tIN\tA\t{ip}\n")
+        #             print(f"File {sub_domain_file} created.")
+
+        #     except IOError as e:
+        #         print(f"Can't open main zone file: {str(e)}")
+        for subdomain in set(subdomain_dict.keys()).union(alias_dict.keys()):
             sub_domain_file = f"build/var/named/master/{subdomain}.{self.domainlow}"
-            #for cms file we dont want cms.cms
+            
+            # For CMS file we don't want cms.cms
             if subdomain == self.domainlow:
                 sub_domain_file = f"build/var/named/master/{subdomain}"
-            #begin to write info into file
+            
+            # Begin to write info into file
             try:
                 with open(sub_domain_file, 'w') as file:
-
-                    #write zone header and static info
+                    # Write zone header and static info
                     file.write(self.read_zone_header())
+                    
                     if subdomain == self.domainlow:
                         file.write(self.read_static_info())
                         file.write("\n")
                         file.write(self.read_rr_alias())
                         file.write("\n")
+                    
+                    # Write devices from the device to ip dictionary
+                    if subdomain in subdomain_dict:
+                        for name, ip in subdomain_dict[subdomain]:
+                            file.write(f"{name}\t\tIN\tA\t{ip}\n")
+                    
+                    # Write devices from the alias dictionary
+                    if subdomain in alias_dict:
+                        for name, alias in alias_dict[subdomain]:
+                            file.write(f"{alias}\t\t\tCNAME\t{name}\n")
 
-                    #input device to ip
-                    for name, ip in devices:
-                        file.write(f"{name}\t\t\t\tIN\tA\t{ip}\n")
                     print(f"File {sub_domain_file} created.")
 
             except IOError as e:
@@ -245,6 +280,7 @@ class cmsnet_extract:
         split_devices = self.split_list(devices, 200)
         subdomain_dict = {}
         zone_dict = {}
+        subdomain_alias_dict = {}
 
         for sub_devices in split_devices:
             device_info = bramdb.landb.getDeviceInfoArray(sub_devices)
@@ -265,23 +301,24 @@ class cmsnet_extract:
                     pattern = re.compile(r'([^-]+)(?:-([^-]+))?--cms\.cern\.ch', re.IGNORECASE)
                     interface_name = interface.get("Name")
                     IPadd = interface.get("IPAddress")
+
+
                     #get reverse IP address and zone in which it exists
-                    
                     zone, ipreverse = reverse_ip(IPadd)
+                    #now for each interface we obtain alias form IPaliases section
+                    alias = interface.get("IPAliases")
+
+
                     if zone not in zone_dict:
                         zone_dict[zone] = []
                     zone_dict[zone].append((ipreverse, interface_name))
-                    
-
+                
 
                     devlower = str(dev_name).lower()
                     #remove --cms from end of each entry
                     if devlower.endswith('--cms'):
                         devlower = devlower[:-5]
                     
-
-
-
                     match = pattern.search(interface_name)
                     if match:
                         subdomain = str(match.group(2)).lower() if match.group(2) else None
@@ -296,6 +333,8 @@ class cmsnet_extract:
                             subdomain_dict[subdomain] = []
 
                         subdomain_dict[subdomain].append((devlower, IPadd))
+                        if alias:
+                            subdomain_alias_dict[subdomain].append((devlower, alias))
                     else:
                         try:
                             pattern2 = re.compile(r'([^-]+)\.cern\.ch', re.IGNORECASE)
@@ -304,10 +343,13 @@ class cmsnet_extract:
                                 subdomain = "cms"
                             
                             subdomain_dict[subdomain].append((devlower, IPadd))
+                            if alias:
+                                subdomain_alias_dict[subdomain].append((devlower, alias))
+
                         except Exception as e:
                             print(f"Interface {interface_name} does not match the criteria: {e}")
-
-                        
+                    
+               
                 #ipmi interfaces checked first and pushed into misc-ipmi.dhcp file
                 ipmi_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.ipmi_IF_domain)
                 if ipmi_interface:
@@ -351,11 +393,23 @@ class cmsnet_extract:
 
                 # Categorize the device and add DHCP information
                 if ip_address and mac and netmask and default_gateway:
-                    group = categorize_device(os, manufacturer, devinfo_dict)
-                    self.add_dhcp(device_name=dev_name, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
+                    # Check if the device name ends with '--cms'
+                    if dev_name.endswith('--cms'):
+                        dev_nocms = dev_name[:-5]  # Strip off '--cms'
+                    else:
+                        dev_nocms = dev_name  # If not, use the original device name
+
+                    # Check if all required information is present
+                    
+                        # Categorize the device
+                        group = categorize_device(os, manufacturer, devinfo_dict)
+                        
+                        # Add the device to the DHCP configuration
+                        self.add_dhcp(device_name=dev_nocms, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
                 else:
-                    print(f"WARNING device {dev_name} not added to DHCP as it has missing entries")
+                    print(f"WARNING: Device {dev_name} not added to DHCP as it has missing entries.")
                     continue
+                
         
         # print(subdomain_dict)
         self.create_files(subdomain_dict, zone_dict)
