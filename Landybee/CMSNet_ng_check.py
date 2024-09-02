@@ -110,16 +110,16 @@ class cmsnet_check:
                 if not ipmi_exists:
                     self.bulk_interface.append(new_impiIF)
 
-        #use device information location to append to interface so that we can compare it to lanDB information.
-        for interface in self.interfaces_landb:
-            if "Location" in interface:
-                interface["Location"] = self.device_input["Location"]
-
         #generate some useful parameters used later
         self.interfaces_landb = intf_list
         self.device_name = device_name
         self.empty = {}
 
+        #use device information location to append to interface so that we can compare it to lanDB information.
+        for interface in self.interfaces_landb:
+            if "Location" in interface:
+                interface["Location"] = self.device_input["Location"]
+                
     #iterates through dictionaries to unnest nested dicts (nested dicts are dictionaries within dictionaries)
     def iterate_nested_dicts(self, json_obj, root_key=None):
         results = {}
