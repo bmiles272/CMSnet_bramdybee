@@ -23,10 +23,20 @@ class cmsnet_extract:
 
     def __init__(self, domain: str) -> None:
 
+        #read alias csv file for CNAME DNS entries
+        file_aliasescsv = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data/cms', 'aliases2.csv'))
+        self.aliasescsvfile = pd.read_csv(file_aliasescsv, comment='#')
+
+
+        #IP ranges that select the correct zones for the reverse IP lookup
         ip_ranges_cms = ("10.176.", "10.184.32.")
         ip_ranges_904 = ("10.192.")
+
+        #some formatting
         self.domain = domain.upper()
         self.domainlow = domain.lower()
+
+        #domains, in future --cms to be changed
         self.IF_domain = ".CERN.CH"
         self.cms_IF_domain = "--CMS.CERN.CH"
         self.ipmi_IF_domain = '-IPMI' + self.cms_IF_domain
@@ -44,7 +54,7 @@ class cmsnet_extract:
         else:
             print(f"Domain {domain} is valid and contains {domainlength} devices.")
 
-
+    #obtain a list of all devices within cms or cms904 (depending on what selected)
     def domain_devices(self, domain):
         dmn_dict = {"Domain": domain}
         try:
@@ -53,9 +63,9 @@ class cmsnet_extract:
             print(f"ERROR obtaining list of device names from domain {domain}: {e}")
         return domain_list
     
+    #tool to find a dictionary within a list based on one of its entries
     def find_dict_by_entry(self, dict_list, key, value):
         for d in dict_list:
-        # Ensure that d is not None and the key exists in the dictionary
             if d is not None:
                 dict_value = d.get(key)
                 if value is None and dict_value is None:
@@ -64,13 +74,15 @@ class cmsnet_extract:
                     return d
         return None
 
-    def create_files(self, subdomain_dict, zone_dict, alias_dict):
-        #generate the files
 
+    #creating the dhcp, dns files.
+    def create_files(self, subdomain_dict, zone_dict, alias_dict):
+        #remove build diretory so we can start with a new one
         shutil.rmtree("build", ignore_errors=True)
 
-        #write dhcp file
+        #generate directories
         os.makedirs("build/var/dhcp/", exist_ok=True)
+        os.makedirs("build/var/named/master/", exist_ok=True)
 
         for i, dhcp_entries in self.dhcp.items():
             filepath = f"build/var/dhcp/{self.domainlow}.{i}.dhcp"
@@ -80,34 +92,8 @@ class cmsnet_extract:
                 print(f"File {filepath} created.")
 
 
-        #Write DNS files
-        # os.makedirs("build/var/named/master/", exist_ok=True)
-        # # Write to the main zone file
-        # for subdomain, devices in subdomain_dict.items():
-        #     sub_domain_file = f"build/var/named/master/{subdomain}.{self.domainlow}"
-        #     #for cms file we dont want cms.cms
-        #     if subdomain == self.domainlow:
-        #         sub_domain_file = f"build/var/named/master/{subdomain}"
-        #     #begin to write info into file
-        #     try:
-        #         with open(sub_domain_file, 'w') as file:
-
-        #             #write zone header and static info
-        #             file.write(self.read_zone_header())
-        #             if subdomain == self.domainlow:
-        #                 file.write(self.read_static_info())
-        #                 file.write("\n")
-        #                 file.write(self.read_rr_alias())
-        #                 file.write("\n")
-
-        #             #input device to ip
-        #             for name, ip in devices:
-        #                 file.write(f"{name}\t\t\t\tIN\tA\t{ip}\n")
-        #             print(f"File {sub_domain_file} created.")
-
-        #     except IOError as e:
-        #         print(f"Can't open main zone file: {str(e)}")
-        for subdomain in set(subdomain_dict.keys()).union(alias_dict.keys()):
+        #write dns files, currently include 
+        for subdomain in subdomain_dict.keys():
             sub_domain_file = f"build/var/named/master/{subdomain}.{self.domainlow}"
             
             # For CMS file we don't want cms.cms
@@ -127,14 +113,12 @@ class cmsnet_extract:
                         file.write("\n")
                     
                     # Write devices from the device to ip dictionary
-                    if subdomain in subdomain_dict:
-                        for name, ip in subdomain_dict[subdomain]:
-                            file.write(f"{name}\t\tIN\tA\t{ip}\n")
+                    for name, ip in subdomain_dict[subdomain]:
+                        file.write(f"{name}\t\tIN\tA\t{ip}\n")
                     
                     # Write devices from the alias dictionary
-                    if subdomain in alias_dict:
-                        for name, alias in alias_dict[subdomain]:
-                            file.write(f"{alias}\t\t\tCNAME\t{name}\n")
+                    for name, alias in alias_dict[subdomain]:
+                        file.write(f"{alias}\t\t\tCNAME\t{name}\n")
 
                     print(f"File {sub_domain_file} created.")
 
@@ -142,30 +126,31 @@ class cmsnet_extract:
                 print(f"Can't open main zone file: {str(e)}")
 
 
-            #write reverseip files
-            for zone, elements in zone_dict.items():
-                zone_reverseip_file = f"build/var/named/master/{zone}.in-addr.arpa"
-               
-                #begin to write info into file
-                try:
-                    with open(zone_reverseip_file, 'w') as file:
+        #write reverseip files
+        for zone, elements in zone_dict.items():
+            zone_reverseip_file = f"build/var/named/master/{zone}.in-addr.arpa"
+            
+            #begin to write info into file
+            try:
+                with open(zone_reverseip_file, 'w') as file:
 
-                        #write zone header and static info
-                        file.write(self.read_zone_header())
-                        
-                        #input reverse IP to device
-                        for revIP, interface in elements:
-                            file.write(f"{revIP}\t\t\t\t\tPTR\t{interface}\n")
-                        print(f"File {zone_reverseip_file} created.")
+                    #write zone header and static info
+                    file.write(self.read_zone_header())
+                    
+                    #input reverse IP to device
+                    for revIP, interface in elements:
+                        file.write(f"{revIP}\t\t\t\t\tPTR\t{interface}\n")
+                    print(f"File {zone_reverseip_file} created.")
 
-                except IOError as e:
-                    print(f"Can't open zone file: {str(e)}")
+            except IOError as e:
+                print(f"Can't open zone file: {str(e)}")
 
-
+    #tool to split list of devices in domain into smaller parts
     def split_list(self, lst, section_length):
         return [lst[i:i + section_length] for i in range(0, len(lst), section_length)]
     
 
+    #dns zone header read from dns_header.txt
     def read_zone_header(self):
         zone_header = ""
         date  = int(time.time())    
@@ -187,6 +172,7 @@ class cmsnet_extract:
         
         return zone_header
     
+    #dns static info read from dns_main_zone_static.txt
     def read_static_info(self):
         static_info = ""
         static_info_path = "data/cms/dns_main_zone_static.txt"
@@ -200,6 +186,7 @@ class cmsnet_extract:
             print(f"ERROR opening file {static_info_path}")
         return static_info
     
+    #read dns_rr_alias.txt added only to cms dns zone file
     def read_rr_alias(self):
         rr_alias = ""
         alias_path = "data/cms/dns_rr_alias.txt"
@@ -214,6 +201,20 @@ class cmsnet_extract:
         return rr_alias
 
     
+    #long fucntion to generate all the data for the dhcp, dns files
+    #In essence what the function does:
+    #- For DHCP:
+    #-- Search each device for a 'trivial' device interface names,
+    #   if the interface has a bound network interface card it obtains mac address,
+    #-- it does the same for ipmi interfaces, 
+    #-- optional(if there is no trivial interface then it checks for the number of interface cards,
+    #           if there is only 1 NIC it uses the mac address from that)
+    #
+    #- For DNS:
+    #-- create dictionary for each, device to ip, reverse ip lookup and cname
+    #-- the key for every dictionary is the zone/subdomain and the elements of the key are pairs (tuples)
+    #   for example: device to ip: {subdomain_1:[(device1, ip1),(device2, ip2),(device3, ip3)], subdomain_2: [(device4, ip4), ...]...}
+    #   using the dictionaries the data is written into the files
     def populate(self):
         def get_interface_info(interface, fallback_networkinterfaces):
             """Helper function to extract IP, MAC, netmask, and gateway info."""
@@ -268,7 +269,6 @@ class cmsnet_extract:
 
             return zone, reversed_ip
 
-
         
         start_time = time.time()
 
@@ -289,90 +289,115 @@ class cmsnet_extract:
 
                 '''Whether or not routers are taken into account for dhcp config files, cms.juniper.dhcp contains then'''
                 #we ignore routers or switch for DHCP config files
-                # if devinfo_dict.get("GenericType") not in ["ROUTER", "SWITCH"]:
-                os = devinfo_dict.get("OperatingSystem")
-                manufacturer = devinfo_dict.get("Manufacturer")
-                dev_name = devinfo_dict.get("DeviceName")
-                interfaces = devinfo_dict.get("Interfaces")
-                interfacecards = devinfo_dict.get("NetworkInterfaceCards")
+                if devinfo_dict.get("GenericType") not in ["VIRTUAL-GATEWAY"]:
+                    os = devinfo_dict.get("OperatingSystem")
+                    manufacturer = devinfo_dict.get("Manufacturer")
+                    dev_name = devinfo_dict.get("DeviceName")
+                    interfaces = devinfo_dict.get("Interfaces")
+                    interfacecards = devinfo_dict.get("NetworkInterfaceCards")
 
-                #populate subdomain list for dns zone files
-                for interface in interfaces:
-                    pattern = re.compile(r'([^-]+)(?:-([^-]+))?--cms\.cern\.ch', re.IGNORECASE)
-                    interface_name = interface.get("Name")
-                    IPadd = interface.get("IPAddress")
-
-
-                    #get reverse IP address and zone in which it exists
-                    zone, ipreverse = reverse_ip(IPadd)
-                    #now for each interface we obtain alias form IPaliases section
-                    alias = interface.get("IPAliases")
+                    #populate subdomain list for dns zone files
+                    for interface in interfaces:
+                        pattern = re.compile(r'([^-]+)(?:-([^-]+))?--cms\.cern\.ch', re.IGNORECASE)
+                        interface_name = interface.get("Name")
+                        IPadd = interface.get("IPAddress")
 
 
-                    if zone not in zone_dict:
-                        zone_dict[zone] = []
-                    zone_dict[zone].append((ipreverse, interface_name))
-                
+                        #get reverse IP address and zone in which it exists
+                        zone, ipreverse = reverse_ip(IPadd)
+                        #now for each interface we obtain alias form IPaliases section
+                        # alias = interface.get("IPAliases")
+                        alias = None    #temporary
+                        if not alias:
+                            alias_devices = self.aliasescsvfile['<FQN of target>'].str.strip().str.lower()
+                            dev_name_lower = dev_name.strip().lower()
+                            if dev_name_lower in alias_devices.values:
+                                alias_row = self.aliasescsvfile[self.aliasescsvfile['<FQN of target>'].str.strip().str.lower() == dev_name_lower]
+                                alias = alias_row['<name>'].values[0]
 
-                    devlower = str(dev_name).lower()
-                    #remove --cms from end of each entry
-                    if devlower.endswith('--cms'):
-                        devlower = devlower[:-5]
+                        if zone not in zone_dict:
+                            zone_dict[zone] = []
+                        zone_dict[zone].append((ipreverse, interface_name))
                     
-                    match = pattern.search(interface_name)
-                    if match:
-                        subdomain = str(match.group(2)).lower() if match.group(2) else None
-                        if subdomain:
-                            if len(str(subdomain)) < 4:
-                                subdomain = None
 
-                        if subdomain is None:
-                            subdomain = "cms"
+                        devlower = str(interface_name).lower()
+                        #remove --cms from end of each entry
+                        if devlower.endswith('--cms.cern.ch'):
+                            devlower = devlower[:-13]
+                        if devlower.endswith('--904.cern.ch'):
+                            devlower = devlower[:-13]
+                        if devlower.endswith('.cern.ch'):
+                            devlower = devlower[:-8]
+                        
+                        match = pattern.search(interface_name)
+                        if match:
+                            subdomain = str(match.group(2)).lower() if match.group(2) else None
+                            if subdomain:
+                                if len(str(subdomain)) < 4:
+                                    subdomain = None
 
-                        if subdomain not in subdomain_dict:
-                            subdomain_dict[subdomain] = []
-
-                        subdomain_dict[subdomain].append((devlower, IPadd))
-                        if alias:
-                            subdomain_alias_dict[subdomain].append((devlower, alias))
-                    else:
-                        try:
-                            pattern2 = re.compile(r'([^-]+)\.cern\.ch', re.IGNORECASE)
-                            match = pattern2.search(interface_name)
-                            if match:
+                            if subdomain is None:
                                 subdomain = "cms"
-                            
+
+                            if subdomain not in subdomain_dict:
+                                subdomain_dict[subdomain] = []
+
                             subdomain_dict[subdomain].append((devlower, IPadd))
+
+                            if subdomain not in subdomain_alias_dict:
+                                subdomain_alias_dict[subdomain] = []
+
                             if alias:
                                 subdomain_alias_dict[subdomain].append((devlower, alias))
+                        else:
+                            try:
+                                pattern2 = re.compile(r'([^.]+)\.CERN\.CH', re.IGNORECASE)
+                                match = pattern2.search(interface_name)
+                                if match:
+                                    # print(f"Pattern2 matched: {match.group(1)}")
+                                    subdomain = str("cms")
 
-                        except Exception as e:
-                            print(f"Interface {interface_name} does not match the criteria: {e}")
+                                    if subdomain not in subdomain_dict:
+                                        subdomain_dict[subdomain] = []
+                                    
+                                    subdomain_dict[subdomain].append((devlower, IPadd))
+
+                                    if subdomain not in subdomain_alias_dict:
+                                        subdomain_alias_dict[subdomain] = []
+
+                                    if alias:
+                                        subdomain_alias_dict[subdomain].append((devlower, alias))
+                                
+                                else:
+                                    print(f"Interface {interface_name} has no match.")
+
+                            except Exception as e:
+                                print(f"Interface {interface_name} does not match the criteria: {e}")
+                        
+                
+                    #ipmi interfaces checked first and pushed into misc-ipmi.dhcp file
+                    ipmi_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.ipmi_IF_domain)
+                    if ipmi_interface:
+                        ip_address, mac, netmask, default_gateway = get_interface_info(ipmi_interface, interfacecards)
+                        if ip_address and mac and netmask and default_gateway:
+                            self.add_dhcp(device_name=dev_name +'-ipmi', ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group='misc-ipmi')
+                        else:
+                            print(f"Ipmi interface {dev_name + self.ipmi_IF_domain} not added to DHCP as it has missing entries (probably no bound interface).")
+
+                    # search for main interface --CMS.CERN.CH
+                    primary_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.cms_IF_domain)
+                    ip_address, mac, netmask, default_gateway = get_interface_info(primary_interface, interfacecards)
+
+                    # if no main trivial interface fallback onto .CERN.CH
+                    if not ip_address and not mac:
+                        cms_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.IF_domain)
+                        ip_address, mac, netmask, default_gateway = get_interface_info(cms_interface, interfacecards)
                     
-               
-                #ipmi interfaces checked first and pushed into misc-ipmi.dhcp file
-                ipmi_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.ipmi_IF_domain)
-                if ipmi_interface:
-                    ip_address, mac, netmask, default_gateway = get_interface_info(ipmi_interface, interfacecards)
-                    if ip_address and mac and netmask and default_gateway:
-                        self.add_dhcp(device_name=dev_name +'-ipmi', ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group='misc-ipmi')
-                    else:
-                        print(f"Ipmi interface {dev_name + self.ipmi_IF_domain} not added to DHCP as it has missing entries (probably no bound interface).")
 
-                # search for main interface --CMS.CERN.CH
-                primary_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.cms_IF_domain)
-                ip_address, mac, netmask, default_gateway = get_interface_info(primary_interface, interfacecards)
-
-                # if no main trivial interface fallback onto .CERN.CH
-                if not ip_address and not mac:
-                    cms_interface = self.find_dict_by_entry(interfaces, 'Name', dev_name + self.IF_domain)
-                    ip_address, mac, netmask, default_gateway = get_interface_info(cms_interface, interfacecards)
-                   
-
-                # Fallback to HCP info if all interface checks fail
-                # if not ip_address and not mac:
-                #     type = devinfo_dict.get("GenericType")
-                #     print(f"ignored {dev_name}, type {type}")
+                    # Fallback to HCP info if all interface checks fail
+                    # if not ip_address and not mac:
+                    #     type = devinfo_dict.get("GenericType")
+                    #     print(f"ignored {dev_name}, type {type}")
 
                     '''Used as a final attempt, if the device has a single DHCP netry we use that, otherwise we cant determine what it is, requires extra call to lanDB though'''
                     # hcpinfo = bramdb.landb.getHCPInfoArray([dev_name])
@@ -386,41 +411,44 @@ class cmsnet_extract:
                     #     else:
                     #         print(f"Not able to specify interface or hardware address for device {dev_name}")
                     #         netmask = default_gateway = ip_address = mac = None
+                    #         continue
                     # else:
-                    #     print(f"WARNING: Device {dev_name} has a hardware address that cannot be tracked down.")
                     #     netmask = default_gateway = ip_address = mac = None
+                    #     continue
 
 
-                # Categorize the device and add DHCP information
-                if ip_address and mac and netmask and default_gateway:
-                    # Check if the device name ends with '--cms'
-                    if dev_name.endswith('--cms'):
-                        dev_nocms = dev_name[:-5]  # Strip off '--cms'
-                    else:
-                        dev_nocms = dev_name  # If not, use the original device name
+                    # Categorize the device and add DHCP information
+                    if ip_address and mac and netmask and default_gateway:
+                        # Check if the device name ends with '--cms'
+                        dev_name_lower = str(dev_name).lower()
+                        if dev_name_lower.endswith('--cms'):
+                            dev_nocms = dev_name_lower[:-5]  # Strip off '--cms'
+                        if dev_name_lower.endswith('--904'):
+                            dev_nocms = dev_name_lower[:-5]  # Strip off '--904'
+                        else:
+                            dev_nocms = dev_name_lower  # If not, use the original device name
 
-                    # Check if all required information is present
-                    
-                        # Categorize the device
-                        group = categorize_device(os, manufacturer, devinfo_dict)
+                        # Check if all required information is present
                         
-                        # Add the device to the DHCP configuration
-                        self.add_dhcp(device_name=dev_nocms, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
-                else:
-                    print(f"WARNING: Device {dev_name} not added to DHCP as it has missing entries.")
-                    continue
+                            # Categorize the device
+                            group = categorize_device(os, manufacturer, devinfo_dict)
+                            
+                            # Add the device to the DHCP configuration
+                            self.add_dhcp(device_name=dev_nocms, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
+                    else:
+                        print(f"WARNING: Device {dev_name} not added to DHCP as it has missing entries.")
+                        continue
                 
         
-        # print(subdomain_dict)
-        self.create_files(subdomain_dict, zone_dict)
+        self.create_files(subdomain_dict, zone_dict, subdomain_alias_dict)
 
-        end_time = time.time()  # End timing
+        end_time = time.time()
         runtime = end_time - start_time
         print(f"Succesfully generated DHCP files.")
         print(f"Process completed in {runtime:.2f} seconds")
 
 
-
+    #generate broadcast address
     def broadcast_address(self, mask, ip):
         if mask and ip:
                   # Splitting up netMask and IP address using regex
@@ -466,3 +494,19 @@ class cmsnet_extract:
             self.dhcp[group].append(dhcp_entry)
         else:
             self.dhcp[group] = [dhcp_entry]
+
+
+def commandline():
+    parser = argparse.ArgumentParser(description= "Extract DNS and DHCP files from devices in a given domain. Format: python3.11 CMSNet_ng_extract.py domain --function")
+    parser.add_argument('domain', type=str, help= 'Name of the domain to retreive DHCP and DNS configurations from.')
+    parser.add_argument('--extract', action='store_true', help='Extract dhcp and dns configuratiopns from devices in domain.')
+
+    args = parser.parse_args()
+    cmsnet = cmsnet_extract(args.domain)
+
+    if args.extract:
+        cmsnet.populate()
+
+
+if __name__ == "__main__":
+    commandline()
