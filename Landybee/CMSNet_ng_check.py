@@ -45,7 +45,8 @@ Some ints chnaged as they are exported as e.g. 0001 instead of 1, zeros are remo
 
 class cmsnet_check:
 
-    def __init__(self, device_name) -> None:
+    def __init__(self, device_name, verbose=False) -> None:
+        self.verbose = verbose
         
         #check for the existance of device
         try:
@@ -203,12 +204,15 @@ class cmsnet_check:
 
         try:
             compare_devinp = self.compare_dicts(flatcms_data= flat_cms_devicesinput, flatlandb_data= flat_landb_deviceinput, matching_keys= matchingkeys)
-            print(f"DEVICE INPUT: Differences found between lanDB database and CMS database for device {self.device_name}:")
+            if self.verbose:
+                print(f"DEVICE INPUT: Differences found between lanDB database and CMS database for device {self.device_name}:")
             if compare_devinp == self.empty:
-                print(f"NO DIFFERENCES")
+                if self.verbose:
+                    print(f"NO DIFFERENCES")
             else:
                 print(compare_devinp)
-            print(f"Device Input paramater comparison COMPLETE.")
+            if self.verbose:
+                print(f"Device Input paramater comparison COMPLETE.")
         except Exception as e:
             print(f"ERROR comparing device input paramaters to lanDB data for device {self.device_name}: {e}")
 
@@ -234,9 +238,11 @@ class cmsnet_check:
                         matching_keys= matchingkeys
                         )
                     
-                    print(f"NICs: Differences found between lanDB database and CMS database for device {self.device_name}:")
+                    if self.verbose:
+                        print(f"NICs: Differences found between lanDB database and CMS database for device {self.device_name}:")
                     if compare_card == self.empty:
-                        print(f"NO DIFFERENCES")
+                        if self.verbose:
+                            print(f"NO DIFFERENCES")
                     else:
                         print(compare_card)
                     
@@ -245,7 +251,8 @@ class cmsnet_check:
             except Exception as e:
                 print(f"ERROR: {e}")
     
-        print(f"Device Interface card comparison COMPLETE.")
+        if self.verbose:
+            print(f"Device Interface card comparison COMPLETE.")
 
     #find a dictionary based on one of the entries in that dictionaries, used when matching the names to dicts as lanDB doesn't give them in same order as in cms data.
     def find_dict_by_entry(self, dict_list, key, value):
@@ -270,25 +277,30 @@ class cmsnet_check:
                     matching_keys= matchingkeys
                     )
                 
-                print(f"INTERFACE: Differences found between lanDB database and CMS database for interface {IFName}:")
+                if self.verbose:
+                    print(f"INTERFACE: Differences found between lanDB database and CMS database for interface {IFName}:")
                 if compare_IF == self.empty:
-                    print(f"NO DIFFERENCES")
+                    if self.verbose:
+                        print(f"NO DIFFERENCES")
                 else:
                     print(compare_IF)
 
             except Exception as e:
                 print(f"ERROR comparing device input paramaters to lanDB data for device {self.device_name}: {e}")
 
-        print(f"Interface comparison complete.")
+        if self.verbose:
+            print(f"Interface comparison complete.")
 
 def commandline():
     parser = argparse.ArgumentParser(description= "Compare information from CMS csv files to lanDB database for given device. Format: python3.11 CMSNet_ng_check.py device_name --function")
     parser.add_argument('device_names', nargs='+', type=str, help='The names of the devices to check.')
     parser.add_argument('--check', action='store_true', help='Check for differences in device information.')
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose output.')
+
 
     args = parser.parse_args()
     for device_name in args.device_names:
-        cmsnet = cmsnet_check(device_name)
+        cmsnet = cmsnet_check(device_name, verbose=args.verbose)
 
         if args.check:
             cmsnet.compare_device_input()
