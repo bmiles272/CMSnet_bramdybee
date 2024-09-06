@@ -38,11 +38,19 @@ class cmsnet_extract:
 
         #domains, in future --cms to be changed
         self.IF_domain = ".CERN.CH"
-        self.cms_IF_domain = "--CMS.CERN.CH"
+        self.cms_IF_domain = "--CMS" + self.IF_domain
         self.ipmi_IF_domain = '-IPMI' + self.cms_IF_domain
+        self.ninezerofour_domain = '--904'
 
         domains = ("cms", "cms904")
 
+        self.allowed_subdomains = ["cdrs0v0", "cdrs1v0", "cms", "d3vcdrs0", "d3vfbs1v0", "d3vfus0", "d3vfus1", "d3vfus3", "d3vrbs1v0", "d3vsms1v0",
+                                   "daq2dqms0v0", "daq2fus10v0", "daq2fus11v0", "daq2fus12v0", "daq2fus13v0", "daq2fus14v0", "daq2fus15v0", "daq2fus16v0",
+                                    "daq2fus17v0", "daq2fus18v0", "daq2fus19v0", "daq2fus20v0", "daq2fus21v0", "daq2fus22v0", "daq2fus35v0", "daq2fus36v0",
+                                    "daq2fus37v0", "daq2fus38v0", "daq2fus39v0", "daq2fus40v0", "daq2fus41v0", "daq2fus42v0", "daq2fus43v0", "daq2fus44v0",
+                                    "daq2fus4v0", "daq2fus8v0", "daq2fus9v0", "daq2sms1v0", "dvfbs2v0", "dvsms2v0", "ebs0", "ebs0v0", "ebs1", "fbs0v0",
+                                    "fus0", "fus23", "fus24", "fus25", "fus26", "fus27", "fus28", "gemec1", "gemec2", "ipmi", "lcgp5", "utca01", "utca02",
+                                    "utca03", "utca04", "utca05", "utca10", "utca11"]
         self.dhcp = []
 
         domainlength = len(self.domain_devices(domain= self.domain))
@@ -113,6 +121,8 @@ class cmsnet_extract:
                         file.write("\n")
                     
                     # Write devices from the device to ip dictionary
+                    
+                    
                     for name, ip in subdomain_dict[subdomain]:
                         file.write(f"{name}\t\tIN\tA\t{ip}\n")
                     
@@ -242,6 +252,8 @@ class cmsnet_extract:
                 netmask = default_gateway = ip_address = mac = None
             return ip_address, mac, netmask, default_gateway
 
+
+        #categorize devices based on conditions below, easily able to be changed 
         def categorize_device(os, manufacturer, devinfo_dict):
             """Helper function to categorize devices."""
             os_name = os.get("Name")
@@ -298,7 +310,7 @@ class cmsnet_extract:
 
                     #populate subdomain list for dns zone files
                     for interface in interfaces:
-                        pattern = re.compile(r'([^-]+)(?:-([^-]+))?--cms\.cern\.ch', re.IGNORECASE)
+                        pattern = re.compile(r'([^-]+)(?:-([^-]+))?' + re.escape(self.cms_IF_domain), re.IGNORECASE)
                         interface_name = interface.get("Name")
                         IPadd = interface.get("IPAddress")
 
@@ -306,8 +318,12 @@ class cmsnet_extract:
                         #get reverse IP address and zone in which it exists
                         zone, ipreverse = reverse_ip(IPadd)
                         #now for each interface we obtain alias form IPaliases section
-                        # alias = interface.get("IPAliases")
-                        alias = None    #temporary
+                        
+
+                        #initialise alias variable
+                        alias = None
+
+                        #once aliases transferred to lanDB this section can be commented out
                         if not alias:
                             alias_devices = self.aliasescsvfile['<FQN of target>'].str.strip().str.lower()
                             dev_name_lower = dev_name.strip().lower()
@@ -315,6 +331,9 @@ class cmsnet_extract:
                                 alias_row = self.aliasescsvfile[self.aliasescsvfile['<FQN of target>'].str.strip().str.lower() == dev_name_lower]
                                 alias = alias_row['<name>'].values[0]
 
+                        if not alias:    
+                            alias = interface.get("IPAliases")
+                            
                         if zone not in zone_dict:
                             zone_dict[zone] = []
                         zone_dict[zone].append((ipreverse, interface_name))
@@ -322,11 +341,11 @@ class cmsnet_extract:
 
                         devlower = str(interface_name).lower()
                         #remove --cms from end of each entry
-                        if devlower.endswith('--cms.cern.ch'):
+                        if devlower.endswith(self.cms_IF_domain):
                             devlower = devlower[:-13]
-                        if devlower.endswith('--904.cern.ch'):
+                        if devlower.endswith(self.ninezerofour_domain + self.IF_domain):
                             devlower = devlower[:-13]
-                        if devlower.endswith('.cern.ch'):
+                        if devlower.endswith(self.IF_domain):
                             devlower = devlower[:-8]
                         
                         match = pattern.search(interface_name)
@@ -338,6 +357,9 @@ class cmsnet_extract:
 
                             if subdomain is None:
                                 subdomain = "cms"
+
+                            if subdomain not in self.allowed_subdomains:
+                               subdomain == 'cms' 
 
                             if subdomain not in subdomain_dict:
                                 subdomain_dict[subdomain] = []
@@ -351,7 +373,7 @@ class cmsnet_extract:
                                 subdomain_alias_dict[subdomain].append((devlower, alias))
                         else:
                             try:
-                                pattern2 = re.compile(r'([^.]+)\.CERN\.CH', re.IGNORECASE)
+                                pattern2 = re.compile(r'([^.]+)' + re.escape(self.IF_domain), re.IGNORECASE)
                                 match = pattern2.search(interface_name)
                                 if match:
                                     # print(f"Pattern2 matched: {match.group(1)}")
@@ -416,25 +438,16 @@ class cmsnet_extract:
                     #     netmask = default_gateway = ip_address = mac = None
                     #     continue
 
-
+                    # Check if all required information is present
                     # Categorize the device and add DHCP information
                     if ip_address and mac and netmask and default_gateway:
-                        # Check if the device name ends with '--cms'
-                        dev_name_lower = str(dev_name).lower()
-                        if dev_name_lower.endswith('--cms'):
-                            dev_nocms = dev_name_lower[:-5]  # Strip off '--cms'
-                        if dev_name_lower.endswith('--904'):
-                            dev_nocms = dev_name_lower[:-5]  # Strip off '--904'
-                        else:
-                            dev_nocms = dev_name_lower  # If not, use the original device name
-
-                        # Check if all required information is present
+                     
                         
-                            # Categorize the device
-                            group = categorize_device(os, manufacturer, devinfo_dict)
-                            
-                            # Add the device to the DHCP configuration
-                            self.add_dhcp(device_name=dev_nocms, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
+                        # Categorize the device
+                        group = categorize_device(os, manufacturer, devinfo_dict)
+                        
+                        # Add the device to the DHCP configuration
+                        self.add_dhcp(device_name=dev_name, ip=ip_address, mac=mac, subnetmask=netmask, def_gateway=default_gateway, group=group)
                     else:
                         print(f"WARNING: Device {dev_name} not added to DHCP as it has missing entries.")
                         continue
@@ -481,12 +494,21 @@ class cmsnet_extract:
         if mac:
             mac = mac.replace('.', ':').replace('-', ':')
 
+        # Check if the device name ends with '--cms'
+        dev_name_lower = str(device_name).lower()
+        if dev_name_lower.endswith(self.cms_IF_domain.lower()):
+            dev_nocms = dev_name_lower[:-5]  # Strip off '--cms'
+        elif dev_name_lower.endswith(self.ninezerofour_domain):
+            dev_nocms = dev_name_lower[:-5]  # Strip off '--904'
+        else:
+            dev_nocms = dev_name_lower  # If not, use the original device name
+
         #generate broadcast address
         broadcast = self.broadcast_address(subnetmask, ip)
 
         dhcp_entry = (
-            f"host {device_name.lower()} {{ hardware ethernet {mac}; fixed-address {ip}; "
-            f"option host-name {device_name.lower()}; option subnet-mask {subnetmask}; "
+            f"host {dev_nocms} {{ hardware ethernet {mac}; fixed-address {ip}; "
+            f"option host-name {dev_nocms}; option subnet-mask {subnetmask}; "
             f"option broadcast-address {broadcast}; option routers {def_gateway}; }}\n"
         )
 
