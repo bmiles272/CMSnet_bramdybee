@@ -131,16 +131,15 @@ class cmsnet_update:
         #using iterated_nested_dicts we flatten both dictionaries to compare all the value
         #it also adjust values within dicts to be easily comparable
         differences = {}
-
-        keys_none_cms = ['ServiceName', 'IP', 'IPv6']
+        
+        keys_none_cms = ['IP', 'IPv6', 'ServiceName']
         for key in keys_none_cms:
             if key in matching_keys and flatcms_data.get(key) is None:
                 matching_keys.remove(key)
 
         if "OutletLabel" in matching_keys:
             if flatcms_data["OutletLabel"] == 'auto' and flatlandb_data['OutletLabel'].startswith('auto'):
-                matching_keys.remove("OutletLabel")
-            
+                matching_keys.remove("OutletLabel")            
 
         for key in matching_keys:
             value_cmsnet = flatcms_data.get(key)
